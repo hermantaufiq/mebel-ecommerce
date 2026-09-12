@@ -1,0 +1,143 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String
+  email         String         @unique
+  passwordHash  String?
+  tier          String         @default("Regular") // Regular, VIP
+  loyaltyPoints Int            @default(0)
+  createdAt     DateTime       @default(now())
+  addresses     Address[]
+  orders        Order[]
+  wishlist      WishlistItem[]
+  cartItems     CartItem[]
+}
+
+model Address {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  recipient   String
+  phone       String
+  fullAddress String
+  notes       String?
+  isDefault   Boolean  @default(false)
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String    // Sofa & Lounge, Kursi Aksen, Meja Kopi, dll
+  slug     String    @unique
+  room     String    // Ruang Tamu, Kamar Tidur, Ruang Makan, Ruang Kerja
+  products Product[]
+}
+
+model Product {
+  id           String           @id @default(cuid())
+  name         String
+  slug         String           @unique
+  description  String
+  price        Int              // simpan dalam rupiah (integer, tanpa desimal)
+  material     String
+  status       String           // Ready Stock, Pre-Order
+  rating       Float            @default(0)
+  reviewCount  Int              @default(0)
+  dimensions   Json?            // { panjang, lebar, tinggi } dalam cm
+  attributes   Json?            // atribut fleksibel: konstruksi, busa, dsb.
+  categoryId   String
+  category     Category         @relation(fields: [categoryId], references: [id])
+  images       ProductImage[]
+  variants     ProductVariant[]
+  wishlistedBy WishlistItem[]
+  cartItems    CartItem[]
+  orderItems   OrderItem[]
+  createdAt    DateTime         @default(now())
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  url       String
+  altText   String?
+  sortOrder Int     @default(0)
+}
+
+model ProductVariant {
+  id          String  @id @default(cuid())
+  productId   String
+  product     Product @relation(fields: [productId], references: [id])
+  type        String  // "material_kayu" | "warna_kain"
+  label       String  // "Jati Natural", "Oatmeal Bouclé"
+  hexOrSwatch String? // untuk render swatch warna
+  priceOffset Int     @default(0)
+  stock       Int     @default(0)
+}
+
+model WishlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  addedAt   DateTime @default(now())
+
+  @@unique([userId, productId])
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  variantId String?
+  qty       Int      @default(1)
+  updatedAt DateTime @updatedAt
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  orderNumber   String      @unique // format: ML-XXXXX
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  status        String      // Diterima, Disiapkan, Dikirim, Selesai
+  subtotal      Int
+  shippingFee   Int         @default(0)
+  installFee    Int         @default(0)
+  tax           Int         @default(0)
+  total         Int
+  paymentMethod   String      // Transfer, Cicilan, QRIS
+  paymentStatus   String      // Pending, Lunas
+  shippingDate    DateTime?
+  recipientName   String      @default("")
+  recipientPhone  String      @default("")
+  shippingAddress String      @default("")
+  deliveryNote    String?
+  deliveryDate    DateTime?
+  deliverySlot    String?      // "Pagi (09:00-12:00)" dll
+  installService  Boolean     @default(true)
+  items           OrderItem[]
+  createdAt       DateTime    @default(now())
+}
+
+model OrderItem {
+  id           String  @id @default(cuid())
+  orderId      String
+  order        Order   @relation(fields: [orderId], references: [id])
+  productId    String
+  product      Product @relation(fields: [productId], references: [id])
+  variantLabel String?
+  qty          Int
+  priceAtOrder Int
+}
