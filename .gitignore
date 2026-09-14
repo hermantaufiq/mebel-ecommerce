@@ -1,7 +1,12 @@
 node_modules/
+.svelte-kit/
+build/
+.vercel/
 .next/
 out/
 dist/
 .env
 .env.local
+.env.production
 *.tsbuildinfo
+_backup_nextjs/

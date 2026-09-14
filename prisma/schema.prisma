@@ -13,14 +13,54 @@ model User {
   id            String         @id @default(cuid())
   name          String
   email         String         @unique
+  emailVerified DateTime?
+  image         String?
+  role          String         @default("user")
   passwordHash  String?
   tier          String         @default("Regular") // Regular, VIP
   loyaltyPoints Int            @default(0)
   createdAt     DateTime       @default(now())
+  accounts      Account[]
+  sessions      Session[]
   addresses     Address[]
   orders        Order[]
   wishlist      WishlistItem[]
   cartItems     CartItem[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
 model Address {
@@ -62,6 +102,10 @@ model Product {
   cartItems    CartItem[]
   orderItems   OrderItem[]
   createdAt    DateTime         @default(now())
+
+  @@index([categoryId])
+  @@index([status])
+  @@index([price])
 }
 
 model ProductImage {
@@ -107,16 +151,16 @@ model CartItem {
 }
 
 model Order {
-  id            String      @id @default(cuid())
-  orderNumber   String      @unique // format: ML-XXXXX
-  userId        String
-  user          User        @relation(fields: [userId], references: [id])
-  status        String      // Diterima, Disiapkan, Dikirim, Selesai
-  subtotal      Int
-  shippingFee   Int         @default(0)
-  installFee    Int         @default(0)
-  tax           Int         @default(0)
-  total         Int
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique // format: ML-XXXXX
+  userId          String
+  user            User        @relation(fields: [userId], references: [id])
+  status          String      // Diterima, Disiapkan, Dikirim, Selesai
+  subtotal        Int
+  shippingFee     Int         @default(0)
+  installFee      Int         @default(0)
+  tax             Int         @default(0)
+  total           Int
   paymentMethod   String      // Transfer, Cicilan, QRIS
   paymentStatus   String      // Pending, Lunas
   shippingDate    DateTime?
@@ -129,6 +173,8 @@ model Order {
   installService  Boolean     @default(true)
   items           OrderItem[]
   createdAt       DateTime    @default(now())
+
+  @@index([userId, createdAt])
 }
 
 model OrderItem {
