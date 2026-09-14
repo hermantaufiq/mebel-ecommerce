@@ -10,3 +10,5 @@ dist/
 .env.production
 *.tsbuildinfo
 _backup_nextjs/
+
+.vercel
