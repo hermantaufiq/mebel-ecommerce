@@ -98,27 +98,46 @@
 					>
 						<Menu class="w-5 h-5" />
 					</Sheet.Trigger>
-					<Sheet.Content side="left" class="w-[310px] sm:w-[380px] bg-stone-warm border-r border-border p-6 overflow-y-auto">
+					<Sheet.Content side="left" class="w-[85vw] max-w-[340px] sm:w-[380px] bg-stone-warm border-r border-border p-5 sm:p-6 overflow-y-auto">
 						<Sheet.Header class="text-left border-b border-border pb-4">
 							<div class="flex items-center gap-3">
-								<div class="w-8 h-8 rounded-full bg-espresso text-stone-warm flex items-center justify-center font-serif text-sm font-bold shadow-sm">
+								<div class="w-8 h-8 rounded-full bg-espresso text-stone-warm flex items-center justify-center font-serif text-sm font-bold shadow-sm shrink-0">
 									ML
 								</div>
 								<div>
-									<Sheet.Title class="font-serif text-lg tracking-wider font-semibold text-espresso">
+									<Sheet.Title class="font-serif text-base sm:text-lg tracking-wider font-semibold text-espresso">
 										MAISON LUMINA
 									</Sheet.Title>
-									<Sheet.Description class="text-xs text-muted-foreground tracking-widest uppercase">
+									<Sheet.Description class="text-[10px] sm:text-xs text-muted-foreground tracking-widest uppercase">
 										Atelier &amp; Meubel Indonesia
 									</Sheet.Description>
 								</div>
 							</div>
 						</Sheet.Header>
 
+						<!-- Mobile Search Input -->
+						<div class="pt-4">
+							<form
+								onsubmit={(e) => {
+									handleSearchSubmit(e);
+									isMobileOpen = false;
+								}}
+								class="relative flex items-center"
+							>
+								<input
+									type="text"
+									bind:value={searchQuery}
+									placeholder="Cari sofa, jati, meja..."
+									class="w-full h-9 pl-8 pr-3 text-xs bg-white border border-border rounded-lg focus:outline-none focus:border-terracotta"
+								/>
+								<Search class="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-2.5 pointer-events-none" />
+							</form>
+						</div>
+
 						<!-- Mobile Nav Links -->
-						<div class="py-6 space-y-6">
+						<div class="py-4 sm:py-6 space-y-5 sm:space-y-6">
 							<div>
-								<span class="text-xs font-semibold text-muted-foreground uppercase tracking-widest block mb-3">
+								<span class="text-xs font-semibold text-muted-foreground uppercase tracking-widest block mb-2 sm:mb-3">
 									Koleksi Ruangan
 								</span>
 								<div class="space-y-1">
@@ -127,7 +146,7 @@
 										<a
 											href={`/produk?kategori=${category.slug}`}
 											onclick={() => (isMobileOpen = false)}
-											class="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-espresso hover:bg-sand/60 transition-colors group"
+											class="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-espresso hover:bg-sand/60 transition-colors group"
 										>
 											<CategoryIcon class="w-4 h-4 text-terracotta group-hover:scale-110 transition-transform shrink-0" />
 											<div class="flex-1">
@@ -295,15 +314,15 @@
 
 		<!-- Center: Brand Logo & Monogram -->
 		<div class="flex items-center justify-center text-center">
-			<a href="/" class="group flex items-center gap-3">
-				<div class="w-9 h-9 rounded-full bg-espresso text-stone-warm flex items-center justify-center font-serif text-base font-bold shadow-sm group-hover:bg-terracotta transition-colors">
+			<a href="/" class="group flex items-center gap-2 sm:gap-3">
+				<div class="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-espresso text-stone-warm flex items-center justify-center font-serif text-sm sm:text-base font-bold shadow-sm group-hover:bg-terracotta transition-colors shrink-0">
 					ML
 				</div>
 				<div class="text-left sm:text-center">
-					<span class="font-serif text-lg sm:text-xl font-bold tracking-[0.18em] text-espresso uppercase block leading-none">
+					<span class="font-serif text-sm min-[380px]:text-base sm:text-xl font-bold tracking-[0.10em] min-[380px]:tracking-[0.14em] sm:tracking-[0.18em] text-espresso uppercase block leading-none">
 						MAISON LUMINA
 					</span>
-					<span class="text-[9px] sm:text-[10px] tracking-[0.25em] text-muted-foreground uppercase block font-medium mt-1">
+					<span class="text-[8px] min-[380px]:text-[9px] sm:text-[10px] tracking-[0.18em] sm:tracking-[0.25em] text-muted-foreground uppercase block font-medium mt-0.5 sm:mt-1">
 						Atelier &amp; Meubel
 					</span>
 				</div>
@@ -311,7 +330,7 @@
 		</div>
 
 		<!-- Right: Action Icons (Search, Wishlist, Cart, Profile) -->
-		<div class="flex items-center gap-1 sm:gap-2">
+		<div class="flex items-center gap-0.5 sm:gap-2">
 			<!-- Quick Search Toggle / Input -->
 			{#if isSearchOpen}
 				<form

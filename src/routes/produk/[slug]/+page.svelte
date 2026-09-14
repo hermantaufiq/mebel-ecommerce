@@ -534,13 +534,35 @@
 						</a>
 					</div>
 
-					<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+					<div class="grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
 						{#each relatedProducts as related}
 							<ProductCard product={related} />
 						{/each}
 					</div>
 				</div>
 			{/if}
+
+			<!-- Mobile Sticky Bottom Action Bar -->
+			<div class="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-[#E8DFD0] p-3 sm:hidden shadow-lg flex items-center justify-between gap-3">
+				<div class="min-w-0 flex-1">
+					<span class="block text-[11px] text-stone-500 truncate">{product.name}</span>
+					<span class="font-serif font-bold text-sm text-[#1F1810]">{formatRupiah(effectivePrice)}</span>
+				</div>
+				<button
+					type="button"
+					onclick={handleAddToCart}
+					disabled={currentStock <= 0}
+					class="h-10 px-4 bg-[#B5652F] hover:bg-[#9E5424] active:scale-95 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 shrink-0 shadow-sm transition-all"
+				>
+					{#if addedFeedback}
+						<Check class="h-4 w-4 text-white" />
+						<span>Ditambah</span>
+					{:else}
+						<ShoppingBag class="h-4 w-4" />
+						<span>+ Keranjang</span>
+					{/if}
+				</button>
+			</div>
 		{/if}
 	</div>
 </div>

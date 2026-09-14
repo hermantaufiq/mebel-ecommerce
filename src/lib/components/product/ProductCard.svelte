@@ -129,26 +129,27 @@
 			</p>
 		</div>
 
-		<div class="pt-2 border-t border-border/60 flex items-center justify-between gap-2">
-			<span class="font-semibold text-sm text-espresso">
+		<div class="pt-2 border-t border-border/60 flex items-center justify-between gap-1.5 sm:gap-2">
+			<span class="font-semibold text-xs sm:text-sm text-espresso truncate">
 				{formatRupiah(product.price)}
 			</span>
 
 			<button
 				type="button"
 				onclick={handleAddToCart}
-				class={`inline-flex items-center gap-1 h-8 px-3 text-xs font-medium rounded-md transition-all shrink-0 ${
+				class={`inline-flex items-center justify-center gap-1 h-8 px-2 sm:px-3 text-xs font-medium rounded-md transition-all shrink-0 ${
 					addedFeedback
 						? 'bg-emerald-600 text-white scale-95'
 						: 'bg-espresso hover:bg-terracotta text-white'
 				}`}
+				aria-label={`Tambah ${product.name} ke keranjang`}
 			>
 				{#if addedFeedback}
 					<Check class="w-3.5 h-3.5" />
-					<span>Masuk</span>
+					<span class="hidden min-[380px]:inline">Masuk</span>
 				{:else}
 					<ShoppingBag class="w-3.5 h-3.5" />
-					<span>+ Cart</span>
+					<span class="hidden min-[380px]:inline">+ Cart</span>
 				{/if}
 			</button>
 		</div>

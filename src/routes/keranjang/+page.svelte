@@ -488,8 +488,9 @@
 									<Loader2 class="h-4 w-4 animate-spin text-white" />
 									<span>Memproses Pesanan...</span>
 								{:else}
-									<ShieldCheck class="h-4 w-4" />
-									<span>Buat Pesanan &amp; Lanjutkan ({formatRupiah(totals.total)})</span>
+									<ShieldCheck class="h-4 w-4 shrink-0" />
+									<span class="hidden sm:inline">Buat Pesanan &amp; Lanjutkan ({formatRupiah(totals.total)})</span>
+									<span class="sm:hidden">Bayar Sekarang ({formatRupiah(totals.total)})</span>
 								{/if}
 							</button>
 

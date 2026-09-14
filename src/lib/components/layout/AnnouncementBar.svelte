@@ -31,12 +31,12 @@
 		</div>
 
 		<!-- Center: Rotating Promo Message -->
-		<div class="flex items-center justify-center flex-1 sm:flex-initial text-center mx-auto overflow-hidden h-5">
+		<div class="flex items-center justify-center flex-1 sm:flex-initial text-center mx-auto overflow-hidden min-h-5 py-0.5">
 			{#key currentIndex}
 				{@const CurrentIcon = announcements[currentIndex].icon}
-				<div class="flex items-center gap-2 animate-in fade-in slide-in-from-bottom-1 duration-500 text-[11px] sm:text-xs">
-					<CurrentIcon class="w-3.5 h-3.5 text-terracotta shrink-0" />
-					<span class="font-medium text-stone-warm">{announcements[currentIndex].text}</span>
+				<div class="flex items-center gap-1.5 sm:gap-2 animate-in fade-in slide-in-from-bottom-1 duration-500 text-[10px] min-[360px]:text-[11px] sm:text-xs text-center justify-center">
+					<CurrentIcon class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-terracotta shrink-0" />
+					<span class="font-medium text-stone-warm truncate max-w-[260px] min-[380px]:max-w-[320px] sm:max-w-none">{announcements[currentIndex].text}</span>
 				</div>
 			{/key}
 		</div>

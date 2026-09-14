@@ -6,8 +6,10 @@ build/
 out/
 dist/
 .env
+.env.*
 .env.local
 .env.production
+.env.production.local
 *.tsbuildinfo
 _backup_nextjs/
 

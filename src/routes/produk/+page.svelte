@@ -310,7 +310,7 @@
 								</Badge>
 							{/if}
 						</Sheet.Trigger>
-						<Sheet.Content side="left" class="w-[320px] sm:w-[380px] bg-stone-warm border-r border-border p-6 overflow-y-auto">
+						<Sheet.Content side="left" class="w-[85vw] max-w-[340px] sm:w-[380px] bg-stone-warm border-r border-border p-5 sm:p-6 overflow-y-auto">
 							<Sheet.Header class="border-b border-border pb-4">
 								<div class="flex items-center justify-between">
 									<Sheet.Title class="text-sm font-semibold text-espresso flex items-center gap-2">
@@ -379,7 +379,7 @@
 
 			<!-- Product Grid -->
 			{#if paginatedProducts.length > 0}
-				<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 sm:gap-6">
+				<div class="grid grid-cols-1 min-[420px]:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
 					{#each paginatedProducts as product (product.id)}
 						<ProductCard {product} />
 					{/each}

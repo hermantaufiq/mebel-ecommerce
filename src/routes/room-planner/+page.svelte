@@ -219,9 +219,9 @@
 		</div>
 
 		<!-- Main Workspace Grid -->
-		<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
-			<!-- LEFT: Product Catalog Sidebar -->
-			<div class="lg:col-span-4 flex flex-col bg-white rounded-2xl border border-border p-5 shadow-xs h-[640px]">
+		<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 mb-12">
+			<!-- LEFT: Product Catalog Sidebar (order-2 on mobile so canvas is visible first) -->
+			<div class="lg:col-span-4 order-2 lg:order-1 flex flex-col bg-white rounded-2xl border border-border p-4 sm:p-5 shadow-xs h-[420px] sm:h-[500px] lg:h-[640px]">
 				<div class="flex items-center justify-between mb-3">
 					<h2 class="font-serif text-base font-bold text-espresso">Katalog Furnitur</h2>
 					<span class="text-[11px] text-muted-foreground font-medium">{filteredProducts.length} item</span>
@@ -295,16 +295,16 @@
 				</div>
 			</div>
 
-			<!-- RIGHT: Interactive Canvas Area -->
-			<div class="lg:col-span-8 flex flex-col space-y-4">
+			<!-- RIGHT: Interactive Canvas Area (order-1 on mobile) -->
+			<div class="lg:col-span-8 order-1 lg:order-2 flex flex-col space-y-4">
 				<!-- Canvas Control Toolbar -->
-				<div class="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-border shadow-xs">
+				<div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 bg-white p-2.5 sm:p-3.5 rounded-2xl border border-border shadow-xs">
 					<!-- Room Tabs -->
-					<div class="flex items-center gap-1.5 bg-sand/30 p-1 rounded-xl">
+					<div class="flex items-center gap-1 bg-sand/30 p-1 rounded-xl overflow-x-auto scrollbar-none">
 						{#each roomTabs as tab}
 							<button
 								onclick={() => roomPlannerStore.setRoomType(tab.key)}
-								class={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+								class={`px-2.5 sm:px-3.5 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
 									roomPlannerStore.roomType === tab.key
 										? 'bg-espresso text-stone-warm shadow-xs'
 										: 'text-espresso/70 hover:text-espresso'
@@ -316,10 +316,10 @@
 					</div>
 
 					<!-- Presets & Grid Toggle -->
-					<div class="flex items-center gap-2">
+					<div class="flex items-center justify-between sm:justify-end gap-2">
 						<button
 							onclick={() => roomPlannerStore.loadPreset(roomPlannerStore.roomType)}
-							class="px-3 py-1.5 text-xs font-semibold text-terracotta hover:bg-sand/30 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+							class="px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-xs font-semibold text-terracotta hover:bg-sand/30 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
 							title="Muat contoh tata letak kurasi desainer interior"
 						>
 							<Sparkles class="w-3.5 h-3.5" />
@@ -328,7 +328,7 @@
 
 						<button
 							onclick={() => roomPlannerStore.toggleGrid()}
-							class={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer ${
+							class={`px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer ${
 								roomPlannerStore.showGrid
 									? 'bg-sand/40 border-terracotta/40 text-espresso'
 									: 'bg-white border-border text-muted-foreground'
@@ -345,7 +345,7 @@
 				<div
 					bind:this={canvasEl}
 					onpointerdown={() => roomPlannerStore.selectItem(null)}
-					class={`relative w-full h-[480px] bg-white rounded-2xl border-2 border-dashed border-border/80 overflow-hidden select-none transition-colors ${
+					class={`relative w-full h-[360px] sm:h-[420px] lg:h-[480px] bg-white rounded-2xl border-2 border-dashed border-border/80 overflow-hidden select-none transition-colors ${
 						roomPlannerStore.showGrid ? 'canvas-grid' : ''
 					}`}
 				>
@@ -462,16 +462,16 @@
 				</div>
 
 				<!-- Canvas Bottom Summary Card -->
-				<div class="bg-white rounded-2xl border border-border p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-					<div class="flex items-center gap-8 w-full sm:w-auto justify-between sm:justify-start">
+				<div class="bg-white rounded-2xl border border-border p-3.5 sm:p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+					<div class="flex items-center gap-3 sm:gap-8 w-full sm:w-auto justify-between sm:justify-start">
 						<div>
-							<p class="text-[10px] uppercase tracking-wider text-terracotta font-bold">ITEM TERPASANG</p>
-							<p class="font-serif text-xl font-bold text-espresso">{roomPlannerStore.itemCount} Item</p>
+							<p class="text-[9px] sm:text-[10px] uppercase tracking-wider text-terracotta font-bold">ITEM TERPASANG</p>
+							<p class="font-serif text-sm sm:text-xl font-bold text-espresso">{roomPlannerStore.itemCount} Item</p>
 						</div>
-						<div class="h-8 w-px bg-border"></div>
+						<div class="h-7 w-px bg-border"></div>
 						<div>
-							<p class="text-[10px] uppercase tracking-wider text-terracotta font-bold">TOTAL ESTIMASI SET</p>
-							<p class="font-serif text-xl font-bold text-espresso">{formatRupiah(roomPlannerStore.totalEstimate)}</p>
+							<p class="text-[9px] sm:text-[10px] uppercase tracking-wider text-terracotta font-bold">TOTAL ESTIMASI SET</p>
+							<p class="font-serif text-sm sm:text-xl font-bold text-espresso">{formatRupiah(roomPlannerStore.totalEstimate)}</p>
 						</div>
 					</div>
 
@@ -479,7 +479,7 @@
 						<button
 							onclick={handleBuyAll}
 							disabled={roomPlannerStore.itemCount === 0}
-							class="w-full sm:w-auto px-6 py-3 bg-terracotta text-white font-semibold text-xs rounded-xl hover:bg-terracotta-hover transition-colors flex items-center justify-center gap-2 shadow-xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+							class="w-full sm:w-auto px-5 sm:px-6 py-2.5 sm:py-3 bg-terracotta text-white font-semibold text-xs rounded-xl hover:bg-terracotta-hover transition-colors flex items-center justify-center gap-2 shadow-xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
 						>
 							<ShoppingBag class="w-4 h-4" />
 							<span>Beli Semua Set Ini</span>

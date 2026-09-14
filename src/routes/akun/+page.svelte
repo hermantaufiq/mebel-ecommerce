@@ -50,16 +50,16 @@
 		</div>
 
 		<!-- User Profile Header Card -->
-		<div class="rounded-3xl border border-[#E8DFD0] bg-white p-6 sm:p-8 shadow-sm">
-			<div class="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+		<div class="rounded-3xl border border-[#E8DFD0] bg-white p-5 sm:p-8 shadow-sm">
+			<div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
 				<!-- Left Profile Info -->
-				<div class="flex items-center gap-4">
-					<div class="flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-full bg-[#1F1810] text-[#F7F3EC] font-serif text-2xl font-bold shadow-md shrink-0">
+				<div class="flex items-center gap-3.5 sm:gap-4">
+					<div class="flex h-14 w-14 sm:h-20 sm:w-20 items-center justify-center rounded-full bg-[#1F1810] text-[#F7F3EC] font-serif text-xl sm:text-2xl font-bold shadow-md shrink-0">
 						{user.name.split(' ').map((n: string) => n[0]).slice(0, 2).join('')}
 					</div>
 					<div>
-						<div class="flex items-center gap-2.5">
-							<h1 class="font-serif text-2xl sm:text-3xl font-bold text-[#1F1810]">
+						<div class="flex flex-wrap items-center gap-2">
+							<h1 class="font-serif text-xl sm:text-3xl font-bold text-[#1F1810]">
 								{user.name}
 							</h1>
 							<Badge class="bg-amber-100 text-amber-900 border-none px-2.5 py-0.5 text-xs font-semibold">
@@ -74,12 +74,12 @@
 				</div>
 
 				<!-- Right Loyalty & Actions -->
-				<div class="flex items-center gap-4 border-t border-[#E8DFD0]/60 pt-4 sm:border-0 sm:pt-0">
-					<div class="rounded-2xl border border-[#E8DFD0] bg-[#F7F3EC] px-4 py-2.5 text-right">
-						<span class="text-[10px] font-semibold uppercase tracking-wider text-stone-500 block">
+				<div class="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 border-t border-[#E8DFD0]/60 pt-4 sm:border-0 sm:pt-0">
+					<div class="rounded-2xl border border-[#E8DFD0] bg-[#F7F3EC] px-3.5 sm:px-4 py-2 sm:py-2.5 text-left sm:text-right">
+						<span class="text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider text-stone-500 block">
 							Poin Loyalitas
 						</span>
-						<span class="font-serif text-lg font-bold text-[#B5652F]">
+						<span class="font-serif text-base sm:text-lg font-bold text-[#B5652F]">
 							{user.loyaltyPoints?.toLocaleString('id-ID') || 0} Poin
 						</span>
 					</div>
@@ -91,17 +91,17 @@
 						title="Keluar dari akun"
 					>
 						<LogOut class="h-4 w-4" />
-						<span class="hidden sm:inline">Keluar</span>
+						<span>Keluar</span>
 					</button>
 				</div>
 			</div>
 
 			<!-- Navigation Tabs -->
-			<div class="mt-8 flex gap-2 border-t border-[#E8DFD0] pt-4">
+			<div class="mt-6 sm:mt-8 flex gap-2 border-t border-[#E8DFD0] pt-4 overflow-x-auto scrollbar-none flex-nowrap pb-1">
 				<button
 					type="button"
 					onclick={() => (activeTab = 'orders')}
-					class="flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all {activeTab === 'orders' ? 'bg-[#1F1810] text-white shadow-sm' : 'text-stone-600 hover:bg-[#F7F3EC]'}"
+					class="flex items-center gap-2 rounded-xl px-3.5 sm:px-4 py-2 text-xs font-semibold whitespace-nowrap shrink-0 transition-all {activeTab === 'orders' ? 'bg-[#1F1810] text-white shadow-sm' : 'text-stone-600 hover:bg-[#F7F3EC]'}"
 				>
 					<Package class="h-4 w-4" />
 					<span>Riwayat Pesanan ({orders.length})</span>
@@ -110,7 +110,7 @@
 				<button
 					type="button"
 					onclick={() => (activeTab = 'addresses')}
-					class="flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all {activeTab === 'addresses' ? 'bg-[#1F1810] text-white shadow-sm' : 'text-stone-600 hover:bg-[#F7F3EC]'}"
+					class="flex items-center gap-2 rounded-xl px-3.5 sm:px-4 py-2 text-xs font-semibold whitespace-nowrap shrink-0 transition-all {activeTab === 'addresses' ? 'bg-[#1F1810] text-white shadow-sm' : 'text-stone-600 hover:bg-[#F7F3EC]'}"
 				>
 					<MapPin class="h-4 w-4" />
 					<span>Buku Alamat</span>
@@ -119,7 +119,7 @@
 				<button
 					type="button"
 					onclick={() => (activeTab = 'concierge')}
-					class="flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all {activeTab === 'concierge' ? 'bg-[#1F1810] text-white shadow-sm' : 'text-stone-600 hover:bg-[#F7F3EC]'}"
+					class="flex items-center gap-2 rounded-xl px-3.5 sm:px-4 py-2 text-xs font-semibold whitespace-nowrap shrink-0 transition-all {activeTab === 'concierge' ? 'bg-[#1F1810] text-white shadow-sm' : 'text-stone-600 hover:bg-[#F7F3EC]'}"
 				>
 					<Phone class="h-4 w-4" />
 					<span>Concierge Atelier</span>
