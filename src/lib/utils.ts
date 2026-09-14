@@ -1,43 +1,37 @@
-import { type ClassValue, clsx } from "clsx";
+import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
-	return twMerge(clsx(inputs));
+  return twMerge(clsx(inputs));
 }
 
-export type WithElementRef<T, E = HTMLElement> = T & {
-	ref?: E | null;
-};
-
-export type WithoutChild<T> = Omit<T, "child">;
-export type WithoutChildren<T> = Omit<T, "children">;
-export type WithoutChildrenOrChild<T> = Omit<T, "children" | "child">;
-
-/**
- * Formats a numeric price to Indonesian Rupiah (e.g., 4850000 -> "Rp 4.850.000")
- */
 export function formatRupiah(amount: number): string {
-	if (typeof amount !== "number" || isNaN(amount)) return "Rp 0";
-	return new Intl.NumberFormat("id-ID", {
-		style: "currency",
-		currency: "IDR",
-		minimumFractionDigits: 0,
-		maximumFractionDigits: 0,
-	}).format(amount).replace(/\s+/g, " ");
+  if (typeof amount !== "number" || isNaN(amount)) {
+    return "Rp 0";
+  }
+  return "Rp " + Math.round(amount).toLocaleString("id-ID");
 }
 
-/**
- * Formats a date string or Date object to Indonesian localized format
- */
-export function formatDateId(date: string | Date): string {
-	try {
-		const d = typeof date === "string" ? new Date(date) : date;
-		return new Intl.DateTimeFormat("id-ID", {
-			day: "numeric",
-			month: "short",
-			year: "numeric",
-		}).format(d);
-	} catch {
-		return String(date);
-	}
+export function formatSimulasiCicilan(price: number, months: number = 12): string {
+  const monthly = Math.round(price / months);
+  return `Cicilan 0% mulai ${formatRupiah(monthly)}/bln (${months}x)`;
+}
+
+export function formatDateId(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(d);
+}
+
+export function slugify(text: string): string {
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^\w\-]+/g, "")
+    .replace(/\-\-+/g, "-");
 }

@@ -1,4 +1,4 @@
-import type { Product, Category, Order, UserProfile } from "$lib/types";
+import { Product, Category, Order, UserProfile } from "@/types";
 
 // ─── Categories ──────────────────────────────────────────────────────────────
 export const categories: Category[] = [
@@ -802,6 +802,3 @@ export const colorSwatchOptions = [
   { label: "Honey Teak", hex: "#C8A951" },
   { label: "Cream", hex: "#F5EDE0" },
 ];
-
-export const mockProducts = products;
-export const mockCategories = categories;
