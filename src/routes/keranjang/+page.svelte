@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import type { PageData } from './$types';
 	import { cartStore } from '$lib/stores/cart.svelte';
 	import { formatRupiah } from '$lib/utils';
 	import { calculateCartTotals } from '$lib/cart-calculations';
@@ -20,13 +22,23 @@
 	import Building2 from '@lucide/svelte/icons/building-2';
 	import Loader2 from '@lucide/svelte/icons/loader-2';
 	import AlertCircle from '@lucide/svelte/icons/alert-circle';
+	import Info from '@lucide/svelte/icons/info';
 
-	// Form delivery states
-	let recipientName = $state('Dian Sastrowardoyo');
-	let recipientPhone = $state('081234567890');
-	let shippingAddress = $state('Jl. Kemang Raya No. 45, Jakarta Selatan 12730');
-	let deliveryNote = $state('Tolong kabari 30 menit sebelum tiba. Unit di lantai 2.');
-	
+	let { data }: { data: PageData } = $props();
+
+	// Form delivery states initialized from authenticated user or defaults
+	let recipientName = $state('');
+	let recipientPhone = $state('');
+	let shippingAddress = $state('');
+	let deliveryNote = $state('');
+
+	$effect(() => {
+		if (!recipientName) recipientName = data.user?.name || data.defaultAddress?.recipient || '';
+		if (!recipientPhone) recipientPhone = data.defaultAddress?.phone || '081234567890';
+		if (!shippingAddress) shippingAddress = data.defaultAddress?.fullAddress || 'Jl. Kemang Raya No. 45, Jakarta Selatan 12730';
+		if (!deliveryNote) deliveryNote = data.defaultAddress?.notes || 'Tolong kabari 30 menit sebelum tiba. Unit di lantai 2.';
+	});
+
 	// Earliest delivery date is H+2
 	const defaultDeliveryDate = new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0];
 	let deliveryDate = $state(defaultDeliveryDate);
@@ -34,9 +46,37 @@
 	let installService = $state(true);
 	let paymentMethod = $state('Transfer Bank (BCA / Mandiri VA)');
 
-	// Submission state
+	// Submission & stock validation state
 	let isSubmitting = $state(false);
 	let errorMessage = $state('');
+	let stockNotice = $state('');
+	let isValidatingStock = $state(false);
+
+	// Real-time stock validation upon opening /keranjang (tidak percaya cache localStorage murni)
+	onMount(async () => {
+		if (cartStore.items.length === 0) return;
+		isValidatingStock = true;
+		try {
+			const res = await fetch('/api/cart/validate', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ items: cartStore.items })
+			});
+			if (res.ok) {
+				const result = await res.json();
+				if (result.items) {
+					const { adjustedCount, removedCount } = cartStore.syncWithValidated(result.items);
+					if (removedCount > 0 || adjustedCount > 0) {
+						stockNotice = `Catatan: Ketersediaan ${adjustedCount + removedCount} produk telah diverifikasi dan disesuaikan dengan stok atelier terbaru.`;
+					}
+				}
+			}
+		} catch (err) {
+			console.warn('Gagal memvalidasi stok keranjang:', err);
+		} finally {
+			isValidatingStock = false;
+		}
+	});
 
 	// Reactive totals
 	let totals = $derived(
@@ -50,6 +90,12 @@
 	async function handleCheckout(e: SubmitEvent) {
 		e.preventDefault();
 		if (cartStore.items.length === 0) return;
+
+		// 1. Enforce login before checkout
+		if (!data.user) {
+			goto(`/login?redirect=${encodeURIComponent('/keranjang')}`);
+			return;
+		}
 
 		if (!recipientName.trim() || !recipientPhone.trim() || !shippingAddress.trim()) {
 			errorMessage = 'Harap lengkapi nama penerima, nomor telepon, dan alamat pengiriman.';
@@ -78,15 +124,19 @@
 				})
 			});
 
-			const data = await res.json();
+			const resData = await res.json();
 
 			if (!res.ok) {
-				throw new Error(data.error || 'Gagal memproses pesanan Anda');
+				if (resData.requireLogin) {
+					goto(`/login?redirect=${encodeURIComponent('/keranjang')}`);
+					return;
+				}
+				throw new Error(resData.error || 'Gagal memproses pesanan Anda');
 			}
 
 			// Clear cart and redirect to confirmation page
 			cartStore.clearCart();
-			goto(`/checkout/konfirmasi?order=${data.orderNumber}`);
+			goto(`/checkout/konfirmasi?order=${resData.orderNumber}`);
 		} catch (err: any) {
 			console.error('Checkout failed:', err);
 			errorMessage = err.message || 'Terjadi kesalahan saat memproses pesanan.';

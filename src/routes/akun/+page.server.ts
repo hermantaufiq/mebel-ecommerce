@@ -1,32 +1,15 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { prisma } from '$lib/server/prisma';
-import { getSessionUser } from '$lib/server/auth';
 
-export const load: PageServerLoad = async ({ cookies }) => {
-	let user = await getSessionUser(cookies);
-
-	if (!user) {
-		// Fallback to default VIP user if existing in database
-		user = await prisma.user.findFirst({
-			where: { email: 'dian.sastro@example.com' },
-			select: {
-				id: true,
-				name: true,
-				email: true,
-				role: true,
-				tier: true,
-				loyaltyPoints: true,
-				createdAt: true
-			}
-		});
-	}
-
+export const load: PageServerLoad = async ({ locals }) => {
+	// Strict auth: no bypass, no fallback to demo account
+	const user = locals.user;
 	if (!user) {
 		throw redirect(303, '/login?redirect=/akun');
 	}
 
-	// Fetch all orders for this user
+	// Fetch orders belonging ONLY to authenticated user
 	const orders = await prisma.order.findMany({
 		where: { userId: user.id },
 		orderBy: { createdAt: 'desc' },
@@ -35,7 +18,8 @@ export const load: PageServerLoad = async ({ cookies }) => {
 				include: {
 					product: {
 						include: {
-							images: true
+							images: true,
+							variants: true
 						}
 					}
 				}
@@ -43,8 +27,15 @@ export const load: PageServerLoad = async ({ cookies }) => {
 		}
 	});
 
+	// Fetch saved addresses for this user
+	const addresses = await prisma.address.findMany({
+		where: { userId: user.id },
+		orderBy: { isDefault: 'desc' }
+	});
+
 	return {
 		user,
-		orders
+		orders,
+		addresses
 	};
 };

@@ -1,10 +1,23 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/prisma';
+import { getSessionUser } from '$lib/server/auth';
 import { calculateCartTotals } from '$lib/cart-calculations';
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, cookies }) => {
 	try {
+		// 1. Authenticate user from session cookie (no bypass/default account)
+		const user = await getSessionUser(cookies);
+		if (!user) {
+			return json(
+				{
+					error: 'Silakan masuk ke akun Anda terlebih dahulu untuk menyelesaikan pesanan.',
+					requireLogin: true
+				},
+				{ status: 401 }
+			);
+		}
+
 		const body = await request.json();
 		const {
 			items,
@@ -15,23 +28,102 @@ export const POST: RequestHandler = async ({ request }) => {
 			deliveryDate,
 			deliverySlot,
 			installService = true,
-			paymentMethod = 'Transfer Bank'
+			paymentMethod = 'Transfer Bank (BCA / Mandiri VA)'
 		} = body;
 
 		if (!items || !Array.isArray(items) || items.length === 0) {
 			return json({ error: 'Keranjang belanja kosong' }, { status: 400 });
 		}
 
-		if (!recipientName || !recipientPhone || !shippingAddress) {
+		if (!recipientName?.trim() || !recipientPhone?.trim() || !shippingAddress?.trim()) {
 			return json(
 				{ error: 'Nama penerima, nomor telepon, dan alamat pengiriman wajib diisi' },
 				{ status: 400 }
 			);
 		}
 
-		// Calculate server-side totals
+		// 2. Fetch and strictly validate product price & stock from database (NEVER trust client payload)
+		interface VerifiedOrderItem {
+			productId: string;
+			variantId: string | null;
+			variantLabel: string | null;
+			qty: number;
+			priceAtOrder: number;
+		}
+
+		const verifiedItems: VerifiedOrderItem[] = [];
+
+		for (const item of items) {
+			const rawProductId = item.productId || item.id;
+			if (!rawProductId) {
+				return json({ error: 'Data produk dalam keranjang tidak valid' }, { status: 400 });
+			}
+
+			// Query real product from database
+			let dbProduct = await prisma.product.findUnique({
+				where: { id: rawProductId },
+				select: { id: true, name: true, price: true }
+			});
+
+			if (!dbProduct && item.slug) {
+				dbProduct = await prisma.product.findUnique({
+					where: { slug: item.slug },
+					select: { id: true, name: true, price: true }
+				});
+			}
+
+			if (!dbProduct) {
+				return json(
+					{ error: `Produk "${item.name || 'furnitur'}" sudah tidak tersedia dalam katalog.` },
+					{ status: 400 }
+				);
+			}
+
+			const qty = Math.max(1, Math.floor(Number(item.qty) || 1));
+			let variantLabel: string | null = item.variantLabel || null;
+			let priceOffset = 0;
+
+			// If variant specified, strictly validate variant from DB
+			if (item.variantId) {
+				const dbVariant = await prisma.productVariant.findUnique({
+					where: { id: item.variantId }
+				});
+
+				if (!dbVariant || dbVariant.productId !== dbProduct.id) {
+					return json(
+						{ error: `Varian yang dipilih untuk produk "${dbProduct.name}" tidak valid.` },
+						{ status: 400 }
+					);
+				}
+
+				if (dbVariant.stock < qty) {
+					return json(
+						{
+							error: `Stok untuk "${dbProduct.name} (${dbVariant.label})" tidak mencukupi (sisa: ${dbVariant.stock}, diminta: ${qty}).`
+						},
+						{ status: 400 }
+					);
+				}
+
+				priceOffset = dbVariant.priceOffset || 0;
+				variantLabel = dbVariant.label;
+			}
+
+			// Server-calculated immutable unit price
+			const verifiedUnitPrice = dbProduct.price + priceOffset;
+
+			verifiedItems.push({
+				productId: dbProduct.id,
+				variantId: item.variantId || null,
+				variantLabel,
+				qty,
+				priceAtOrder: verifiedUnitPrice
+			});
+		}
+
+		// 3. Single source of truth calculation with verified database prices
 		const totals = calculateCartTotals(
-			items.map((i) => ({ unitPrice: i.unitPrice || i.price, qty: i.qty })),
+			verifiedItems.map((i) => ({ unitPrice: i.priceAtOrder, qty: i.qty })),
 			{
 				shippingFee: 0, // Free delivery Jabodetabek
 				installFee: 0,  // Free assembly service
@@ -39,71 +131,37 @@ export const POST: RequestHandler = async ({ request }) => {
 			}
 		);
 
-		// Resolve or create user (VIP demo account or existing)
-		let user = await prisma.user.findFirst({
-			where: { email: 'dian.sastro@example.com' }
-		});
-
-		if (!user) {
-			user = await prisma.user.create({
-				data: {
-					name: recipientName || 'Dian Sastrowardoyo',
-					email: 'dian.sastro@example.com',
-					role: 'user',
-					tier: 'VIP',
-					loyaltyPoints: 1250
-				}
-			});
-		}
-
-		// Fallback product in case mock product IDs differ
-		const firstProduct = await prisma.product.findFirst({ select: { id: true, price: true } });
-
-		// Prepare order items
-		const orderItemsData = await Promise.all(
-			items.map(async (item: any) => {
-				const rawId = item.productId || item.id;
-				const slug = item.slug;
-
-				let validProduct = null;
-				if (rawId) {
-					validProduct = await prisma.product.findUnique({
-						where: { id: rawId },
-						select: { id: true, price: true }
-					});
-				}
-				if (!validProduct && slug) {
-					validProduct = await prisma.product.findUnique({
-						where: { slug },
-						select: { id: true, price: true }
-					});
-				}
-
-				const finalProductId = validProduct?.id || firstProduct?.id;
-				if (!finalProductId) {
-					throw new Error('Produk tidak valid dalam pesanan');
-				}
-
-				const priceAtOrder = Math.round(
-					item.unitPrice || item.price || validProduct?.price || 0
-				);
-
-				return {
-					productId: finalProductId,
-					variantLabel: item.variantLabel || null,
-					qty: Math.max(1, item.qty || 1),
-					priceAtOrder
-				};
-			})
-		);
-
-		// Generate random unique orderNumber ML-XXXXX
+		// 4. Generate unique orderNumber ML-XXXXX
 		const randomDigits = Math.floor(10000 + Math.random() * 90000);
 		const orderNumber = `ML-${randomDigits}`;
 
-		// Execute database transaction
+		// 5. Execute atomic transaction (Create order + Decrement stock + Clear user cart)
 		const order = await prisma.$transaction(async (tx) => {
-			// 1. Create order and order items
+			// A. Atomic stock verification & decrement
+			for (const vItem of verifiedItems) {
+				if (vItem.variantId) {
+					const freshVariant = await tx.productVariant.findUnique({
+						where: { id: vItem.variantId }
+					});
+
+					if (!freshVariant || freshVariant.stock < vItem.qty) {
+						throw new Error(
+							`Stok untuk varian "${vItem.variantLabel || 'produk'}" baru saja habis atau tidak mencukupi (tersedia: ${freshVariant?.stock ?? 0}).`
+						);
+					}
+
+					await tx.productVariant.update({
+						where: { id: vItem.variantId },
+						data: {
+							stock: {
+								decrement: vItem.qty
+							}
+						}
+					});
+				}
+			}
+
+			// B. Create order with immutable server-calculated prices
 			const newOrder = await tx.order.create({
 				data: {
 					orderNumber,
@@ -124,7 +182,12 @@ export const POST: RequestHandler = async ({ request }) => {
 					deliverySlot: deliverySlot || 'Pagi (09:00 - 12:00 WIB)',
 					installService: Boolean(installService),
 					items: {
-						create: orderItemsData
+						create: verifiedItems.map((item) => ({
+							productId: item.productId,
+							variantLabel: item.variantLabel,
+							qty: item.qty,
+							priceAtOrder: item.priceAtOrder
+						}))
 					}
 				},
 				include: {
@@ -136,28 +199,10 @@ export const POST: RequestHandler = async ({ request }) => {
 				}
 			});
 
-			// 2. Decrement stock for variants if variantId provided
-			for (const item of items) {
-				if (item.variantId) {
-					try {
-						const variant = await tx.productVariant.findUnique({
-							where: { id: item.variantId }
-						});
-						if (variant && variant.stock >= item.qty) {
-							await tx.productVariant.update({
-								where: { id: item.variantId },
-								data: {
-									stock: {
-										decrement: item.qty
-									}
-								}
-							});
-						}
-					} catch (variantErr) {
-						console.warn('Could not decrement variant stock:', variantErr);
-					}
-				}
-			}
+			// C. Clear any persistent database cart items for this logged-in user
+			await tx.cartItem.deleteMany({
+				where: { userId: user.id }
+			});
 
 			return newOrder;
 		});
@@ -165,14 +210,13 @@ export const POST: RequestHandler = async ({ request }) => {
 		return json({
 			success: true,
 			orderNumber: order.orderNumber,
-			orderId: order.id,
-			order
+			orderId: order.id
 		});
 	} catch (error: any) {
 		console.error('Checkout API error:', error);
 		return json(
 			{ error: error.message || 'Gagal memproses transaksi pesanan' },
-			{ status: 500 }
+			{ status: 400 }
 		);
 	}
 };

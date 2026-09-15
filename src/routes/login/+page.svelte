@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { cartStore } from '$lib/stores/cart.svelte';
 	import Breadcrumb from '$lib/components/ui/breadcrumb/Breadcrumb.svelte';
 
 	import Lock from '@lucide/svelte/icons/lock';
@@ -40,7 +41,8 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					email: loginEmail,
-					password: loginPassword
+					password: loginPassword,
+					guestCartItems: cartStore.items
 				})
 			});
 
@@ -49,6 +51,8 @@
 				throw new Error(data.error || 'Gagal masuk');
 			}
 
+			// Clear local guest cart after successful merge on server
+			cartStore.clearCart();
 			goto(redirectUrl);
 		} catch (err: any) {
 			errorMessage = err.message || 'Terjadi kesalahan saat masuk';
@@ -84,6 +88,8 @@
 				throw new Error(data.error || 'Pendaftaran gagal');
 			}
 
+			// Clear local guest cart after successful registration
+			cartStore.clearCart();
 			goto(redirectUrl);
 		} catch (err: any) {
 			errorMessage = err.message || 'Terjadi kesalahan saat mendaftar';

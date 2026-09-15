@@ -5,6 +5,8 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { goto } from '$app/navigation';
 
+	import { cartStore } from '$lib/stores/cart.svelte';
+
 	import User from '@lucide/svelte/icons/user';
 	import Package from '@lucide/svelte/icons/package';
 	import MapPin from '@lucide/svelte/icons/map-pin';
@@ -15,12 +17,50 @@
 	import Phone from '@lucide/svelte/icons/phone';
 	import ShieldCheck from '@lucide/svelte/icons/shield-check';
 	import Wrench from '@lucide/svelte/icons/wrench';
+	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+	import Check from '@lucide/svelte/icons/check';
 
 	let { data }: { data: PageData } = $props();
 	let user = $derived(data.user);
 	let orders = $derived(data.orders || []);
+	let addresses = $derived(data.addresses || []);
 
 	let activeTab = $state<'orders' | 'addresses' | 'concierge'>('orders');
+	let reorderSuccessMsg = $state('');
+
+	function handleReorderItem(item: any) {
+		cartStore.addItem({
+			productId: item.productId,
+			variantId: item.variantId || null,
+			name: item.product?.name || 'Item Furnitur',
+			unitPrice: item.product?.price || item.priceAtOrder,
+			image: item.product?.images?.[0]?.url || '',
+			variantLabel: item.variantLabel || undefined,
+			qty: item.qty || 1,
+			maxStock: 99,
+			slug: item.product?.slug
+		});
+		reorderSuccessMsg = `"${item.product?.name || 'Item'}" berhasil ditambahkan ke keranjang belanja.`;
+		setTimeout(() => {
+			reorderSuccessMsg = '';
+		}, 3500);
+	}
+
+	function handleReorderAll(order: any) {
+		const itemsToAdd = order.items.map((item: any) => ({
+			productId: item.productId,
+			variantId: item.variantId || null,
+			name: item.product?.name || 'Item Furnitur',
+			unitPrice: item.product?.price || item.priceAtOrder,
+			image: item.product?.images?.[0]?.url || '',
+			variantLabel: item.variantLabel || undefined,
+			qty: item.qty || 1,
+			maxStock: 99,
+			slug: item.product?.slug
+		}));
+		cartStore.addMultipleItems(itemsToAdd);
+		goto('/keranjang');
+	}
 
 	async function handleLogout() {
 		try {
@@ -130,6 +170,22 @@
 		<!-- Tab Contents -->
 		<div class="mt-8">
 			{#if activeTab === 'orders'}
+				<!-- Reorder Toast Notification -->
+				{#if reorderSuccessMsg}
+					<div class="mb-5 flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-800 shadow-sm animate-in fade-in slide-in-from-top-2">
+						<div class="flex items-center gap-2">
+							<Check class="h-4 w-4 text-emerald-600 shrink-0" />
+							<span>{reorderSuccessMsg}</span>
+						</div>
+						<a
+							href="/keranjang"
+							class="font-semibold text-emerald-700 underline hover:text-emerald-900 shrink-0"
+						>
+							Buka Keranjang &rarr;
+						</a>
+					</div>
+				{/if}
+
 				<!-- Orders List -->
 				{#if orders.length === 0}
 					<div class="rounded-3xl border border-[#E8DFD0] bg-white px-6 py-16 text-center shadow-sm">
@@ -190,13 +246,13 @@
 								<!-- Items Preview List -->
 								<div class="divide-y divide-[#E8DFD0]/60 py-2">
 									{#each order.items as item}
-										<div class="flex items-center justify-between py-3">
+										<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-3">
 											<div class="flex items-center gap-3">
 												{#if item.product?.images?.[0]?.url}
 													<img
 														src={item.product.images[0].url}
 														alt={item.product.name}
-														class="h-12 w-14 rounded-md object-cover border border-[#E8DFD0] bg-[#EDE4D7]"
+														class="h-12 w-14 rounded-md object-cover border border-[#E8DFD0] bg-[#EDE4D7] shrink-0"
 													/>
 												{/if}
 												<div>
@@ -214,9 +270,20 @@
 												</div>
 											</div>
 
-											<span class="font-serif text-xs font-bold text-[#1F1810]">
-												{formatRupiah(item.priceAtOrder * item.qty)}
-											</span>
+											<div class="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t border-dashed border-[#E8DFD0]/60 sm:border-0">
+												<span class="font-serif text-xs font-bold text-[#1F1810]">
+													{formatRupiah(item.priceAtOrder * item.qty)}
+												</span>
+												<button
+													type="button"
+													onclick={() => handleReorderItem(item)}
+													class="inline-flex items-center gap-1.5 rounded-lg border border-[#E8DFD0] bg-white px-2.5 py-1.5 text-[11px] font-semibold text-stone-700 hover:border-[#B5652F] hover:text-[#B5652F] transition-colors shadow-2xs"
+													title="Tambahkan item ini kembali ke keranjang"
+												>
+													<RotateCcw class="h-3 w-3 text-[#B5652F]" />
+													<span>Beli Lagi</span>
+												</button>
+											</div>
 										</div>
 									{/each}
 								</div>
@@ -227,13 +294,24 @@
 										<span>Tujuan: <strong>{order.recipientName}</strong>, {order.shippingAddress}</span>
 									</div>
 
-									<a
-										href="/checkout/konfirmasi?order={order.orderNumber}"
-										class="inline-flex items-center gap-1.5 rounded-lg bg-[#1F1810] px-4 py-2 text-xs font-semibold text-white hover:bg-[#B5652F] transition-colors"
-									>
-										<span>Lihat E-Invoice &amp; Pelacakan</span>
-										<ArrowRight class="h-3.5 w-3.5" />
-									</a>
+									<div class="flex items-center gap-2">
+										<button
+											type="button"
+											onclick={() => handleReorderAll(order)}
+											class="inline-flex items-center gap-1.5 rounded-lg border border-[#1F1810] bg-white px-3.5 py-2 text-xs font-semibold text-[#1F1810] hover:bg-[#F7F3EC] transition-colors shadow-2xs"
+											title="Tambahkan seluruh item pesanan ini ke keranjang"
+										>
+											<RotateCcw class="h-3.5 w-3.5 text-[#B5652F]" />
+											<span>Beli Lagi Semua</span>
+										</button>
+										<a
+											href="/checkout/konfirmasi?order={order.orderNumber}"
+											class="inline-flex items-center gap-1.5 rounded-lg bg-[#1F1810] px-4 py-2 text-xs font-semibold text-white hover:bg-[#B5652F] transition-colors shadow-xs"
+										>
+											<span>Lihat E-Invoice</span>
+											<ArrowRight class="h-3.5 w-3.5" />
+										</a>
+									</div>
 								</div>
 							</div>
 						{/each}
@@ -242,25 +320,53 @@
 			{:else if activeTab === 'addresses'}
 				<!-- Saved Addresses -->
 				<div class="rounded-2xl border border-[#E8DFD0] bg-white p-6 shadow-sm space-y-4">
-					<h2 class="font-serif text-lg font-semibold text-[#1F1810]">
-						Alamat Pengiriman Utama
-					</h2>
-
-					<div class="rounded-xl border border-[#E8DFD0] bg-[#F7F3EC]/50 p-5 space-y-2">
-						<div class="flex items-center justify-between">
-							<span class="font-serif text-sm font-bold text-[#1F1810]">Rumah (Utama)</span>
-							<Badge class="bg-[#1F1810] text-white text-[10px]">Default</Badge>
-						</div>
-						<p class="text-xs font-semibold text-stone-800">
-							{user.name} (0812-3456-7890)
-						</p>
-						<p class="text-xs text-stone-600 leading-relaxed">
-							Jl. Kemang Raya No. 45, RT 02 / RW 05, Bangka, Mampang Prapatan, Jakarta Selatan, DKI Jakarta 12730
-						</p>
-						<div class="pt-2 text-[11px] text-stone-500 italic">
-							Catatan: Akses mudah lift barang, konfirmasi 30 menit sebelum pengantaran.
-						</div>
+					<div class="flex items-center justify-between">
+						<h2 class="font-serif text-lg font-semibold text-[#1F1810]">
+							Buku Alamat Pengiriman
+						</h2>
 					</div>
+
+					{#if addresses.length > 0}
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							{#each addresses as addr}
+								<div class="rounded-xl border border-[#E8DFD0] bg-[#F7F3EC]/50 p-5 space-y-2">
+									<div class="flex items-center justify-between">
+										<span class="font-serif text-sm font-bold text-[#1F1810]">{addr.isDefault ? 'Alamat Utama' : 'Alamat Pengiriman'}</span>
+										{#if addr.isDefault}
+											<Badge class="bg-[#1F1810] text-white text-[10px]">Default</Badge>
+										{/if}
+									</div>
+									<p class="text-xs font-semibold text-stone-800">
+										{addr.recipient} ({addr.phone})
+									</p>
+									<p class="text-xs text-stone-600 leading-relaxed">
+										{addr.fullAddress}
+									</p>
+									{#if addr.notes}
+										<div class="pt-2 text-[11px] text-stone-500 italic">
+											Catatan: {addr.notes}
+										</div>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					{:else}
+						<div class="rounded-xl border border-[#E8DFD0] bg-[#F7F3EC]/50 p-5 space-y-2">
+							<div class="flex items-center justify-between">
+								<span class="font-serif text-sm font-bold text-[#1F1810]">Rumah (Utama)</span>
+								<Badge class="bg-[#1F1810] text-white text-[10px]">Default</Badge>
+							</div>
+							<p class="text-xs font-semibold text-stone-800">
+								{user.name} (0812-3456-7890)
+							</p>
+							<p class="text-xs text-stone-600 leading-relaxed">
+								Jl. Kemang Raya No. 45, RT 02 / RW 05, Bangka, Mampang Prapatan, Jakarta Selatan, DKI Jakarta 12730
+							</p>
+							<div class="pt-2 text-[11px] text-stone-500 italic">
+								Catatan: Akses mudah lift barang, konfirmasi 30 menit sebelum pengantaran.
+							</div>
+						</div>
+					{/if}
 				</div>
 			{:else if activeTab === 'concierge'}
 				<!-- Concierge Atelier -->

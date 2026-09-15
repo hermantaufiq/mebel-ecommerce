@@ -468,7 +468,7 @@
 							<button
 								type="button"
 								onclick={handleAddToCart}
-								disabled={currentStock <= 0}
+								disabled={currentStock <= 0 || addedFeedback}
 								class="flex flex-1 items-center justify-center gap-2.5 rounded-lg bg-[#B5652F] px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#9E5424] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
 							>
 								{#if addedFeedback}

@@ -168,6 +168,59 @@ export class CartStore {
 		this.items = [];
 		this.save();
 	}
+
+	setItems(items: CartItem[]) {
+		this.items = items;
+		this.save();
+	}
+
+	syncWithValidated(
+		validatedList: Array<{
+			id?: string;
+			productId: string;
+			variantId?: string | null;
+			isAvailable: boolean;
+			availableStock: number;
+			currentPrice: number;
+			adjustedQty: number;
+		}>
+	): { adjustedCount: number; removedCount: number } {
+		let adjustedCount = 0;
+		let removedCount = 0;
+		const nextItems: CartItem[] = [];
+
+		for (const item of this.items) {
+			const targetVariant = item.variantId ?? null;
+			const match = validatedList.find(
+				(v) =>
+					(v.id && v.id === item.id) ||
+					(v.productId === item.productId && (v.variantId ?? null) === targetVariant)
+			);
+
+			if (!match || !match.isAvailable || match.availableStock <= 0) {
+				removedCount++;
+				continue;
+			}
+
+			let newQty = item.qty;
+			if (item.qty > match.availableStock) {
+				newQty = match.availableStock;
+				adjustedCount++;
+			}
+
+			nextItems.push({
+				...item,
+				qty: newQty,
+				maxStock: match.availableStock,
+				unitPrice: match.currentPrice
+			});
+		}
+
+		this.items = nextItems;
+		this.save();
+
+		return { adjustedCount, removedCount };
+	}
 }
 
 export const cartStore = new CartStore();
