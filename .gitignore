@@ -14,9 +14,3 @@ dist/
 _backup_nextjs/
 
 .vercel
-src_svelte_backup/
-static_svelte_backup/
-package_svelte.json
-package-lock_svelte.json
-tsconfig_svelte.json
-vite.config_svelte.ts
