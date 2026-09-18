@@ -110,6 +110,46 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			}
 		}
 
+		// Retrieve all consolidated cart items with full product details
+		let consolidatedCartItems: any[] = [];
+		try {
+			const dbCart = await prisma.cartItem.findMany({
+				where: { userId: user.id },
+				include: {
+					product: {
+						include: {
+							images: true,
+							variants: true
+						}
+					}
+				}
+			});
+
+			consolidatedCartItems = dbCart.map((item) => {
+				const variant = item.variantId
+					? item.product.variants.find((v) => v.id === item.variantId)
+					: null;
+				const unitPrice = item.product.price + (variant?.priceOffset || 0);
+				const maxStock = variant ? variant.stock : 99;
+
+				return {
+					id: item.id,
+					productId: item.productId,
+					variantId: item.variantId,
+					name: item.product.name,
+					image: item.product.images[0]?.url || '',
+					unitPrice,
+					qty: Math.min(item.qty, maxStock),
+					maxStock,
+					material: item.product.material,
+					variantLabel: variant?.label,
+					slug: item.product.slug
+				};
+			});
+		} catch (fetchErr) {
+			console.warn('Failed to fetch consolidated cart items:', fetchErr);
+		}
+
 		return json({
 			success: true,
 			user: {
@@ -119,7 +159,8 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 				role: user.role,
 				tier: user.tier,
 				loyaltyPoints: user.loyaltyPoints
-			}
+			},
+			cartItems: consolidatedCartItems
 		});
 	} catch (err: any) {
 		console.error('Login error:', err);

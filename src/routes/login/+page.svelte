@@ -11,6 +11,7 @@
 	import Loader2 from '@lucide/svelte/icons/loader-2';
 	import AlertCircle from '@lucide/svelte/icons/alert-circle';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
+	import ShoppingBag from '@lucide/svelte/icons/shopping-bag';
 
 	let mode = $state<'login' | 'register'>('login');
 
@@ -29,6 +30,9 @@
 	let successMessage = $state('');
 
 	let redirectUrl = $derived($page.url.searchParams.get('redirect') || '/akun');
+	let isFromCheckout = $derived(
+		$page.url.searchParams.get('from') === 'checkout' || redirectUrl.includes('/keranjang')
+	);
 
 	async function handleLogin(e: SubmitEvent) {
 		e.preventDefault();
@@ -51,8 +55,10 @@
 				throw new Error(data.error || 'Gagal masuk');
 			}
 
-			// Clear local guest cart after successful merge on server
-			cartStore.clearCart();
+			// If server returned consolidated/merged cart items, update local store
+			if (data.cartItems && Array.isArray(data.cartItems) && data.cartItems.length > 0) {
+				cartStore.items = data.cartItems;
+			}
 			goto(redirectUrl);
 		} catch (err: any) {
 			errorMessage = err.message || 'Terjadi kesalahan saat masuk';
@@ -79,7 +85,8 @@
 				body: JSON.stringify({
 					name: regName,
 					email: regEmail,
-					password: regPassword
+					password: regPassword,
+					guestCartItems: cartStore.items
 				})
 			});
 
@@ -88,8 +95,10 @@
 				throw new Error(data.error || 'Pendaftaran gagal');
 			}
 
-			// Clear local guest cart after successful registration
-			cartStore.clearCart();
+			// If server returned consolidated/merged cart items, update local store
+			if (data.cartItems && Array.isArray(data.cartItems) && data.cartItems.length > 0) {
+				cartStore.items = data.cartItems;
+			}
 			goto(redirectUrl);
 		} catch (err: any) {
 			errorMessage = err.message || 'Terjadi kesalahan saat mendaftar';
@@ -139,6 +148,30 @@
 						: 'Daftarkan diri Anda untuk menikmati kurasi furnitur eksklusif.'}
 				</p>
 			</div>
+
+			<!-- Checkout Context Banner -->
+			{#if isFromCheckout}
+				<div class="mt-5 rounded-2xl border border-amber-200 bg-amber-50/90 p-4 text-xs text-amber-950 shadow-2xs text-left animate-in fade-in slide-in-from-top-2">
+					<div class="flex items-start gap-3">
+						<div class="flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-[#B5652F] shrink-0 mt-0.5">
+							<ShoppingBag class="h-4 w-4" />
+						</div>
+						<div class="space-y-1 flex-1">
+							<p class="font-bold text-amber-950">
+								Satu Langkah Lagi Menuju Pesanan Anda
+							</p>
+							<p class="text-stone-600 leading-relaxed">
+								Silakan masuk atau daftarkan akun baru untuk menyelesaikan pembayaran pesanan.
+								{#if cartStore.items.length > 0}
+									<span class="block mt-1 font-semibold text-[#B5652F]">
+										{cartStore.itemCount} produk di keranjang belanja Anda tetap tersimpan aman.
+									</span>
+								{/if}
+							</p>
+						</div>
+					</div>
+				</div>
+			{/if}
 
 			<!-- Tab Switcher -->
 			<div class="mt-6 grid grid-cols-2 rounded-xl bg-[#F7F3EC] p-1 border border-[#E8DFD0]/60">

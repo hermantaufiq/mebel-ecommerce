@@ -54,6 +54,27 @@
 
 	// Real-time stock validation upon opening /keranjang (tidak percaya cache localStorage murni)
 	onMount(async () => {
+		// Restore pending checkout form filled by guest before login redirect
+		if (typeof window !== 'undefined') {
+			try {
+				const savedForm = sessionStorage.getItem('maison_pending_checkout');
+				if (savedForm) {
+					const parsed = JSON.parse(savedForm);
+					if (parsed.recipientName) recipientName = parsed.recipientName;
+					if (parsed.recipientPhone) recipientPhone = parsed.recipientPhone;
+					if (parsed.shippingAddress) shippingAddress = parsed.shippingAddress;
+					if (parsed.deliveryNote) deliveryNote = parsed.deliveryNote;
+					if (parsed.deliveryDate) deliveryDate = parsed.deliveryDate;
+					if (parsed.deliverySlot) deliverySlot = parsed.deliverySlot;
+					if (parsed.paymentMethod) paymentMethod = parsed.paymentMethod;
+					if (parsed.installService !== undefined) installService = parsed.installService;
+					sessionStorage.removeItem('maison_pending_checkout');
+				}
+			} catch (e) {
+				console.warn('Failed to restore pending checkout form:', e);
+			}
+		}
+
 		if (cartStore.items.length === 0) return;
 		isValidatingStock = true;
 		try {
@@ -91,9 +112,26 @@
 		e.preventDefault();
 		if (cartStore.items.length === 0) return;
 
-		// 1. Enforce login before checkout
+		// 1. Enforce login before checkout (Pola Shopee: simpan form & redirect dengan ramah)
 		if (!data.user) {
-			goto(`/login?redirect=${encodeURIComponent('/keranjang')}`);
+			if (typeof window !== 'undefined') {
+				try {
+					sessionStorage.setItem(
+						'maison_pending_checkout',
+						JSON.stringify({
+							recipientName,
+							recipientPhone,
+							shippingAddress,
+							deliveryNote,
+							deliveryDate,
+							deliverySlot,
+							installService,
+							paymentMethod
+						})
+					);
+				} catch (e) {}
+			}
+			goto(`/login?redirect=${encodeURIComponent('/keranjang')}&from=checkout`);
 			return;
 		}
 
