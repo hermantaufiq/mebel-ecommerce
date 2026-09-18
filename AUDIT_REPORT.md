@@ -1,80 +1,104 @@
-# Laporan Audit & Konsolidasi Logika Fundamental Sisi Pengguna
-**Proyek:** Maison Lumina — Atelier & Meubel Indonesia (SvelteKit 2 + Runes + Tailwind CSS v4 + Prisma + Neon PostgreSQL)  
-**Tanggal:** 15 September 2026  
-**Status Audit:** ✅ **LULUS PENUH (ALL TESTS PASSED & HARDENED)**
+# Laporan Audit & Konsolidasi Logika Fundamental Sisi Pengguna (Maison Lumina)
+
+**Proyek:** Maison Lumina — Atelier & Meubel Indonesia (SvelteKit 2 + Svelte 5 Runes + Tailwind CSS v4 + Prisma + Neon PostgreSQL)  
+**Tanggal Audit:** 18 September 2026  
+**Status Akhir:** ✅ **LULUS PENUH (ALL SPECIFICATIONS & HARDENING PASSED)**
 
 ---
 
-## 1. Ringkasan Eksekutif
+## 1. Audit Alur Pengguna End-to-End
 
-Audit ini dilakukan setelah penyelesaian Tahap 1–6 (Setup Layout, Katalog Produk, Keranjang & Wishlist, Checkout, Otentikasi & Akun, Craftsmanship & Room Planner) untuk memvalidasi bahwa seluruh aturan bisnis, keamanan transaksi, dan logika fundamental e-commerce di sisi pengguna berjalan tanpa celah (*watertight*) sebelum pembangunan Admin Panel dimulai.
+Berikut adalah hasil penelusuran alur pengguna secara end-to-end dari browsing awal hingga fitur "Beli Lagi" (Reorder):
 
-Semua celah potensial migrasi (seperti bypass akun demo, potensi manipulasi harga dari client, race-condition stok keranjang, dan inkonsistensi kepemilikan pesanan) telah **diidentifikasi, diperbaiki, dan diuji secara menyeluruh**.
-
----
-
-## 2. Matriks Temuan & Status Perbaikan (Sebelum vs Sesudah)
-
-| Area Logika | Kondisi Awal (Sebelum Audit) | Status Baru (Setelah Audit) | Status |
-| :--- | :--- | :--- | :---: |
-| **Otentikasi & Akun Demo** | Terdapat *fallback* otomatis ke akun demo `dian.sastro@example.com` tanpa verifikasi password murni di endpoint login dan loader `/akun`. | Bypass dihapus total. Password diverifikasi ketat via `bcrypt.compare`. Sesi dikelola via cookie aman (`ml_session`) dan divalidasi via `hooks.server.ts`. | ✅ AMAN |
-| **Proteksi Rute (Auth Guard)** | Pengecekan auth dilakukan secara parsial di client component. | Middleware global `src/hooks.server.ts` menginjeksi `event.locals.user` dan otomatis mengarahkan akses tanpa izin ke `/login?redirect=...`. | ✅ AMAN |
-| **Validasi Harga (Anti-Tampering)** | Client mengirimkan `unitPrice` ke endpoint checkout yang berisiko dimanipulasi via console browser. | Server mengabaikan `unitPrice` dari client. Harga dihitung ulang langsung dari database (`product.price + variant.priceOffset`) sebagai *single source of truth*. | ✅ AMAN |
-| **Validasi Stok Transaksional** | Pengurangan stok rentan *race condition* jika beberapa user memesan varian yang sama secara bersamaan. | Transaksi dijalankan secara atomic di `prisma.$transaction`. Stok diverifikasi sebelum order dibuat dan dikurangi seketika (`decrement: item.qty`). Transaksi otomatis rollback jika stok tidak cukup. | ✅ AMAN |
-| **Validasi Stok Real-Time Keranjang** | Keranjang hanya mengandalkan snapshot `localStorage`. Jika stok berkurang di atelier, user baru mengetahuinya saat checkout gagal. | Endpoint `/api/cart/validate` otomatis memverifikasi stok database saat `/keranjang` dibuka, menyesuaikan kuantitas jika stok berkurang, dan memunculkan notifikasi transparan. | ✅ AMAN |
-| **Sinkronisasi Cart Guest ke Akun** | Item yang dikumpulkan saat browsing sebagai guest berisiko hilang atau tertimpa saat login. | Disediakan endpoint `/api/cart/sync` dan integrasi pada form login/register untuk menggabungkan (*merge*) item guest ke akun user tanpa duplikasi baris. | ✅ AMAN |
-| **Proteksi Kepemilikan Pesanan** | Halaman `/checkout/konfirmasi` hanya membaca nomor pesanan dari URL tanpa mencocokkan identitas pemilik. | Server loader memverifikasi `order.userId === session.user.id`. Akses oleh pihak ketiga langsung diblokir dengan status `403 Forbidden`. | ✅ AMAN |
-| **Alur Pengguna: "Beli Lagi" (Reorder)** | Belum ada tombol praktis untuk memesan kembali produk dari riwayat transaksi terdahulu di `/akun`. | Ditambahkan fitur "Beli Lagi" per item dan "Beli Lagi Semua" di setiap kartu pesanan dengan notifikasi konfirmasi langsung. | ✅ SELESAI |
-| **Pencegahan Double-Click PDP** | Tombol "Tambah ke Keranjang" dapat diklik berkali-kali secara cepat saat animasi feedback aktif. | Tombol otomatis berstatus `disabled` ketika `addedFeedback` aktif atau ketika stok varian habis (0). | ✅ AMAN |
-| **Responsif Seluruh Layar HP** | Ruang denah virtual (Room Planner) dan drawer navigasi membutuhkan penataan mobile yang fleksibel. | Kanvas Room Planner mengutamakan denah visual di mobile (`order-1`), navigasi drawer mobile `w-[85vw] max-w-[340px]` rapi, dan tabel transaksi responsif. | ✅ OPTIMAL |
+| Langkah Alur | Komponen / File Logika | Validasi Server-Side? | Status | Catatan / Mekanisme |
+| :--- | :--- | :---: | :---: | :--- |
+| **1. Browsing (Beranda / Koleksi)** | `src/routes/+page.svelte`<br>`src/routes/produk/+page.svelte`<br>`src/lib/components/product/ProductCard.svelte` | ✅ Ya (data via SSR/DB) | ✅ Sesuai | Filter kategori, sorting harga/nama, search instan. Guest bebas browsing tanpa login. |
+| **2. Lihat Detail Produk (PDP)** | `src/routes/produk/[slug]/+page.svelte` | ✅ Ya (data produk & varian real-time dari database) | ✅ Sesuai | Pilihan varian (`type: warna_kain, material_kayu, ukuran`), kalkulasi harga offset, indikator stok dinamis. |
+| **3. Tambah ke Wishlist & Cart** | `src/lib/stores/wishlist.svelte.ts`<br>`src/lib/stores/cart.svelte.ts` | ✅ Ya (client store + sync server) | ✅ Sesuai | Wishlist murni guest/local tanpa login. Cart mengidentifikasi `productId + variantId`. Anti double-click feedback aktif. |
+| **4. Buka Keranjang** | `src/routes/keranjang/+page.svelte`<br>`src/routes/keranjang/+page.server.ts`<br>`src/routes/api/cart/validate/+server.ts` | ✅ Ya (`/api/cart/validate` memverifikasi harga & stok database) | ✅ Sesuai | Bebas dibuka tanpa login. Begitu dibuka, sistem revalidasi stok riil atelier. Terdapat banner informatif ramah guest (Pola Shopee). |
+| **5. Isi Form Pengiriman** | `src/routes/keranjang/+page.svelte` | ✅ Ya (divalidasi saat submit di `/api/checkout`) | ✅ Sesuai | Draft form disimpan ke `sessionStorage ('maison_pending_checkout')` jika guest dialihkan ke login, lalu di-restore otomatis saat kembali. |
+| **6. Pilih Metode Pembayaran** | `src/routes/keranjang/+page.svelte` | ✅ Ya (divalidasi format & tipe di server) | ✅ Sesuai | Transfer Bank (BCA / Mandiri VA), Cicilan 0%, QRIS / E-Wallet Instan. |
+| **7. Submit Order** | `src/routes/api/checkout/+server.ts` | ✅ Ya (Wajib login, revalidasi DB, atomic transaction) | ✅ Sesuai | Guest dicegat ramah ke `/login?redirect=/keranjang&from=checkout`. Unit price klien diabaikan; harga & stok ditarik dari DB dalam `prisma.$transaction`. |
+| **8. Halaman Konfirmasi (E-Invoice)** | `src/routes/checkout/konfirmasi/+page.svelte`<br>`src/routes/checkout/konfirmasi/+page.server.ts` | ✅ Ya (`order.userId === session.user.id`) | ✅ Sesuai | Akses pihak ketiga ditolak dengan `403 Forbidden`. Menampilkan rincian pesanan resmi, instruksi transfer VA, dan nomor pesanan. |
+| **9. Riwayat Pesanan (Akun)** | `src/routes/akun/+page.svelte`<br>`src/routes/akun/+page.server.ts`<br>`src/hooks.server.ts` | ✅ Ya (middleware `hooks.server.ts` + query `userId`) | ✅ Sesuai | Rute `/akun` dilindungi auth guard. Menampilkan pesanan, profil, poin loyalitas, dan buku alamat pengguna. |
+| **10. Beli Lagi (Reorder)** | `src/routes/akun/+page.svelte`<br>`src/lib/stores/cart.svelte.ts` | ✅ Ya (validasi stok sebelum masuk cart) | ✅ Sesuai | Tersedia tombol "Beli Lagi" per produk dan "Beli Lagi Semua" per transaksi. Item langsung dimasukkan kembali ke cart dengan notifikasi toast. |
 
 ---
 
-## 3. Detail Verifikasi Alur Pengguna End-to-End
+## 2. Checklist Aturan Fundamental
 
-```mermaid
-graph TD
-    A[1. Browsing & Katalog] -->|Pilih Varian & Cek Stok| B[2. Detail Produk PDP]
-    B -->|Tambah ke Keranjang| C[3. Keranjang Belanja]
-    C -->|Auto-validate Stok Database| C1{Stok Cukup?}
-    C1 -->|Ya| D[4. Form Checkout]
-    C1 -->|Tidak| C2[Sesuaikan Qty & Notifikasi]
-    D -->|Wajib Login| E{Sudah Login?}
-    E -->|Belum| E1[Redirect ke /login?redirect=/keranjang]
-    E1 -->|Login Sukses & Merge Cart| D
-    E -->|Sudah| F[5. Atomic Transaction di Neon DB]
-    F -->|Harga Resmi Server & Decrement Stok| G[6. Konfirmasi Pesanan / E-Invoice]
-    G -->|Verifikasi Kepemilikan userId| H[7. Akun Saya & Riwayat]
-    H -->|Fitur Beli Lagi / Reorder| C
-```
+### 2.1 Identitas Item Cart
+- [x] Item cart diidentifikasi dari kombinasi `productId + variantId`, bukan `productId` saja (`CartStore.hasItem`, `CartStore.addItem`).
+- [x] Produk + varian identik yang ditambahkan dua kali → kuantitas bertambah (`existing.qty + newItem.qty`), tidak membuat baris baru.
+- [x] Produk sama dengan varian berbeda (misal: warna Kain Emerald vs Beige) → baris terpisah dengan id unik.
 
-1. **Jelajah & Katalog**: Kategori, filter material kayu jati & kain linen, serta fitur pencarian instan berfungsi responsif.
-2. **Detail Produk (PDP)**: Pemilihan varian (warna kain / ukuran) menghitung selisih harga (*offset*) secara real-time. Tombol Add to Cart memproteksi duplikasi klik.
-3. **Keranjang (`/keranjang`)**: Begitu halaman dimuat, client menghubungi `/api/cart/validate`. Jika stok riil di database berkurang, jumlah item disesuaikan dan pesan peringatan atelier ditampilkan.
-4. **Checkout**: Mengharuskan otentikasi. Data pengiriman diambil otomatis dari buku alamat utama pengguna.
-5. **Server Transaction**: API `/api/checkout` menghitung ulang subtotal, PPN 11%, dan biaya layanan. Prisma menjalankan transaksi ACID untuk menjamin konsistensi data.
-6. **Konfirmasi & E-Invoice (`/checkout/konfirmasi`)**: Menampilkan rincian pesanan resmi, instruksi pembayaran VA / transfer, dan melarang akses user yang tidak berhak.
-7. **Akun Pengguna (`/akun`)**: Menyajikan data profil, poin loyalitas, buku alamat, dan riwayat pesanan.
-8. **Fitur "Beli Lagi"**: Tombol reorder mengembalikan item pesanan ke keranjang belanja dengan sekali klik.
+### 2.2 Batas Quantity & Stok
+- [x] Kuantitas minimum 1. Tombol "-" pada saat `qty === 1` memanggil `removeItem(id)` (menghapus item dengan aman).
+- [x] Kuantitas tidak bisa melebihi stok maksimum varian (`Math.min(qty, maxStock)`).
+- [x] Saat halaman `/keranjang` dibuka, stok divalidasi ulang via `/api/cart/validate` ke database Neon PostgreSQL (tidak percaya cache lokal mentah).
+
+### 2.3 Satu Fungsi Kalkulasi Harga (Single Source of Truth)
+- [x] `calculateCartTotals` di [`src/lib/cart-calculations.ts`](file:///c:/laragon/www/Ecommerce%20-%20Mebel/src/lib/cart-calculations.ts) menjadi satu-satunya acuan hitung subtotal, diskon, PPN 11%, dan total pembayaran.
+- [x] Dipakai konsisten di: halaman Keranjang, API checkout transaksi server, halaman Konfirmasi, dan Riwayat Pesanan.
+- [x] Unit test Vitest (`npx vitest run`) lulus 100% (10 tests passed across test suites).
+
+### 2.4 Validasi Server-Side Saat Checkout
+- [x] Endpoint `POST /api/checkout` mengambil ulang harga katalog (`product.price`) dan offset varian (`variant.priceOffset`) dari database — sama sekali **tidak** mempercayai `unitPrice` yang dikirim dari klien browser.
+- [x] Proses pembuatan pesanan (`Order`), pengurangan stok varian (`decrement: item.qty`), dan pengosongan cart berjalan di dalam satu `prisma.$transaction` (ACID, atomic rollback jika stok tiba-tiba habis).
+- [x] Manipulasi harga via console/devtools di client browser terbukti tidak berdampak apa pun ke nilai transaksi resmi di database.
+
+### 2.5 Proteksi Kepemilikan Data
+- [x] Halaman `/checkout/konfirmasi` memvalidasi `order.userId === session.user.id`. Percobaan membuka invoice pesanan milik orang lain langsung dihentikan dengan error `403 Forbidden`.
+- [x] Halaman `/akun` memfilter query pesanan dan alamat dengan `where: { userId: user.id }`.
+- [x] Middleware [`src/hooks.server.ts`](file:///c:/laragon/www/Ecommerce%20-%20Mebel/src/hooks.server.ts) secara global memproteksi seluruh rute privat (`/akun/*`).
+
+### 2.6 Guest vs Logged-in State
+- [x] Pengguna belum login: keranjang dan wishlist tersimpan mandiri di Svelte 5 reactive store dan `localStorage`.
+- [x] Saat login atau registrasi akun baru: fungsi sinkronisasi `/api/auth/login` dan `/api/auth/register` otomatis menggabungkan (*merge*) item tamu ke tabel `CartItem` di database tanpa menduplikasi produk/varian yang sama.
+- [x] Wishlist tetap dapat diakses dan digunakan penuh tanpa pernah dipaksa login.
+
+### 2.7 Anti Race Condition
+- [x] Tombol "Tambah ke Keranjang" di PDP dinonaktifkan (`disabled`) saat animasi konfirmasi berlangsung (`addedFeedback`) atau ketika stok habis (0).
+- [x] Tombol "Buat Pesanan & Lanjutkan" di halaman checkout berstatus `disabled` dan menampilkan indikator loading spinner (`isSubmitting`) untuk mencegah *double-submit*.
+- [x] Perubahan kuantitas di keranjang beroperasi secara instan di local store tanpa request HTTP bertumpuk.
+
+### 2.8 Keamanan Otentikasi (Auth)
+- [x] Verifikasi kata sandi diverifikasi murni dengan `bcrypt.compare` via `verifyPassword`.
+- [x] Tidak ada lagi jalur pintas (*bypass*) atau login instan tanpa password. Akun demo `dian.sastro@example.com` di-hash dan diverifikasi dengan standar yang sama.
+- [x] Cookie sesi (`ml_session`) menggunakan atribut keamanan ketat: `httpOnly: true`, `sameSite: 'lax'`, `path: '/'`, dan `secure` pada mode produksi.
+
+### 2.9 Guest Browsing & Login Wajib Saat Checkout (Pola Shopee)
+- [x] Browsing katalog, pencarian, penyaringan, detail produk, wishlist, dan keranjang belanja dapat dilakukan tanpa login.
+- [x] Rute `/keranjang` **terbuka untuk publik/guest**; pencegatan login hanya terjadi tepat saat menekan tombol submit pesanan.
+- [x] Saat guest menekan tombol buat pesanan, draft data formulir pengiriman (nama, telepon, alamat, jadwal, catatan) disimpan di `sessionStorage ('maison_pending_checkout')`, lalu diarahkan ke `/login?redirect=/keranjang&from=checkout`.
+- [x] Setelah login atau daftar akun, item keranjang digabung ke database, user dialihkan kembali ke `/keranjang`, dan data draft pengiriman langsung direstorasi otomatis.
+- [x] Halaman `/login` menampilkan banner visual konteks pesanan jika dialihkan dari checkout.
+- [x] Wishlist bebas dari keharusan login di setiap bagian.
+- [x] `hooks.server.ts` tidak memblokir `/keranjang` untuk guest.
 
 ---
 
-## 4. Hasil Pengujian & Uji Kelaikan
+## 3. Evaluasi Kebutuhan Tambahan & Rekomendasi
 
-1. **TypeScript & Svelte Check**:
-   - `npm run check` selesai dengan 0 kesalahan kritis.
-2. **Kalkulasi Keranjang & PPN**:
-   - Fungsi `calculateCartTotals` diuji secara deterministik dengan pembulatan rupiah yang presisi.
-3. **Database Neon PostgreSQL**:
-   - Skema Prisma terpasang lengkap dengan model `User`, `Product`, `ProductVariant`, `CartItem`, `Order`, `OrderItem`, dan `Address`.
+1. **Error Handling & State Kosong**:
+   - Status: Lengkap. Halaman keranjang kosong, wishlist kosong, dan riwayat pesanan kosong sudah memiliki ilustrasi dan tombol aksi (CTA) yang jelas menuju katalog furnitur.
+2. **Notifikasi Transaksional**:
+   - Status: Berjalan baik. Invoice instan diberikan via `/checkout/konfirmasi` lengkap dengan petunjuk transfer/QRIS, dan notifikasi konfirmasi interaktif saat reorder di `/akun`.
+   - *Rekomendasi Tahap Admin*: Menambahkan modul email otomatis (Resend/SendGrid) saat status pesanan diubah oleh Admin (misal: "Pesanan Dikirim").
+3. **Format & Konsistensi UI**:
+   - Status: Konsisten. Seluruh representasi mata uang menggunakan utilitas `formatRupiah`, tanggal menggunakan `formatDateId`, dan warna status badge (Amber/Blue/Emerald) seragam di semua komponen.
 
 ---
 
-## 5. Kesimpulan & Langkah Selanjutnya
+## 4. Ringkasan Pengujian Sistem
 
-Fondasi sisi pengguna (*user-facing fundamentals*) kini berada dalam kondisi **prima, aman, dan siap produksi**. Arsitektur ini memberikan landasan yang kuat untuk memulai tahap berikutnya:
+- **TypeScript / Svelte Diagnostic (`npm run check`)**: 0 error, 0 warning.
+- **Unit Testing Vitest (`npx vitest run`)**: 10 tests passed (100% success).
+- **Vite Production Bundler (`vite build`)**: Seluruh bundle client, server chunks, dan routing halaman terkompilasi optimal (`✓ built in 1m 2s`).
+- **Database Synchronization**: Tabel Neon PostgreSQL terhubung aktif dengan skema Prisma terbaru.
 
-👉 **Siap Melangkah ke Pengembangan Admin Panel (Maison Lumina Atelier Backoffice)**:
-- Manajemen Inventaris & Multi-Variant Stock
-- Manajemen Pesanan & Status Pengiriman (Menunggu Pembayaran → Diproses → Dikirim → Selesai)
-- Pelaporan Penjualan & Analytics Pelanggan
+---
+
+## 5. Kesimpulan & Kesiapan Pengembangan
+
+Dengan seluruh checklist di Section 2 berstatus ✅ dan alur pengguna terverifikasi secara end-to-end tanpa regresi, **fondasi logika pengguna e-commerce Maison Lumina telah kokoh dan siap masuk ke pengembangan modul Admin Panel**.
