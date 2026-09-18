@@ -234,6 +234,31 @@
 				</p>
 			</div>
 
+			<!-- Guest Reminder Banner (Non-intrusive Pola Shopee) -->
+			{#if !data.user}
+				<div class="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-amber-200/80 bg-amber-50/70 p-4 text-xs text-amber-950 shadow-2xs backdrop-blur-xs">
+					<div class="flex items-center gap-3">
+						<div class="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-[#B5652F] shrink-0">
+							<Info class="h-4 w-4" />
+						</div>
+						<div class="space-y-0.5">
+							<p class="font-semibold text-amber-950">
+								Anda sedang menjelajah sebagai Tamu
+							</p>
+							<p class="text-stone-600">
+								Semua produk di keranjang Anda tersimpan aman. Masuk atau daftar akun untuk menyelesaikan pesanan &amp; memantau proses pengiriman.
+							</p>
+						</div>
+					</div>
+					<a
+						href="/login?redirect={encodeURIComponent('/keranjang')}&from=checkout"
+						class="shrink-0 rounded-lg bg-amber-100 px-3.5 py-1.5 font-semibold text-[#B5652F] hover:bg-amber-200 transition-colors"
+					>
+						Masuk / Daftar &rarr;
+					</a>
+				</div>
+			{/if}
+
 			<!-- Main 2-Column Grid -->
 			<div class="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12">
 				<!-- Left Column: Cart Items & Special Furniture Services (7 cols) -->
@@ -581,6 +606,12 @@
 									<span class="sm:hidden">Bayar Sekarang ({formatRupiah(totals.total)})</span>
 								{/if}
 							</button>
+
+							{#if !data.user}
+								<p class="text-[11px] text-stone-500 text-center leading-relaxed">
+									*Anda akan diarahkan untuk masuk/mendaftar saat tombol diklik. Isian form &amp; keranjang akan disimpan otomatis.
+								</p>
+							{/if}
 
 							<!-- Trust Statement -->
 							<div class="flex items-center justify-center gap-4 pt-2 text-[11px] text-stone-500 text-center">
