@@ -5,7 +5,6 @@
 	import Hammer from '@lucide/svelte/icons/hammer';
 	import Shield from '@lucide/svelte/icons/shield';
 	import Droplets from '@lucide/svelte/icons/droplets';
-	import Compass from '@lucide/svelte/icons/compass';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import Award from '@lucide/svelte/icons/award';
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';

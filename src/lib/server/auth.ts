@@ -40,6 +40,7 @@ export async function getSessionUser(cookies: Cookies) {
 				name: true,
 				email: true,
 				role: true,
+				totalSpending: true,
 				tier: true,
 				loyaltyPoints: true,
 				createdAt: true

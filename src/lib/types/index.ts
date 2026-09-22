@@ -3,7 +3,7 @@ export interface ProductVariant {
   productId: string;
   type: 'material_kayu' | 'warna_kain' | 'ukuran' | string;
   label: string;
-  hexOrSwatch?: string;
+  hexOrSwatch?: string | null;
   priceOffset: number;
   stock: number;
 }
@@ -76,7 +76,7 @@ export interface CartItem {
 }
 
 export interface WishlistItem {
-  id: string;
+  id?: string;
   productId: string;
   name: string;
   slug: string;
@@ -150,3 +150,32 @@ export interface PlacedRoomItem {
   width: number;
   height: number;
 }
+
+export type RewardCategory = 'voucher' | 'layanan' | 'garansi' | 'pengiriman';
+
+export interface Reward {
+  id: string;
+  name: string;
+  description: string;
+  category: RewardCategory | string;
+  pointsCost: number;
+  minTier: 'Regular' | 'Silver' | 'Gold' | 'Platinum' | string;
+  stock: number | null;
+  isActive: boolean;
+  validityDays: number | null;
+  createdAt: string | Date;
+}
+
+export interface RewardRedemption {
+  id: string;
+  userId: string;
+  rewardId: string;
+  reward?: Reward;
+  pointsSpent: number;
+  status: 'Aktif' | 'Terpakai' | 'Kedaluwarsa';
+  redeemedAt: string | Date;
+  expiresAt?: string | Date | null;
+  usedAt?: string | Date | null;
+  voucherCode?: string | null;
+}
+

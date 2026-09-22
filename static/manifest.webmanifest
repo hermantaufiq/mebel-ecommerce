@@ -1,0 +1,16 @@
+{
+	"name": "Maison Lumina — Atelier & Meubel Indonesia",
+	"short_name": "Maison Lumina",
+	"description": "Kurasi mebel kayu jati solid premium dengan desain arsitektural kontemporer.",
+	"start_url": "/",
+	"display": "standalone",
+	"background_color": "#F7F3EC",
+	"theme_color": "#1F1810",
+	"icons": [
+		{
+			"src": "/favicon.svg",
+			"sizes": "any",
+			"type": "image/svg+xml"
+		}
+	]
+}

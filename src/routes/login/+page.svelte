@@ -27,7 +27,6 @@
 	// State
 	let isLoading = $state(false);
 	let errorMessage = $state('');
-	let successMessage = $state('');
 
 	let redirectUrl = $derived($page.url.searchParams.get('redirect') || '/akun');
 	let isFromCheckout = $derived(

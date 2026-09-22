@@ -15,7 +15,6 @@
 	import Phone from '@lucide/svelte/icons/phone';
 	import Wrench from '@lucide/svelte/icons/wrench';
 	import Calendar from '@lucide/svelte/icons/calendar';
-	import ShieldCheck from '@lucide/svelte/icons/shield-check';
 
 	let { data }: { data: PageData } = $props();
 	let order = $derived(data.order);

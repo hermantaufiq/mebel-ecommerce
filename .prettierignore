@@ -1,0 +1,12 @@
+.svelte-kit
+build
+package
+node_modules
+.env
+.env.*
+!.env.example
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+prisma/migrations
+_backup_nextjs

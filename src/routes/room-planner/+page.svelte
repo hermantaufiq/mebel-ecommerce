@@ -4,7 +4,7 @@
 	import { cartStore } from '$lib/stores/cart.svelte';
 	import { products } from '$lib/mockData';
 	import { formatRupiah } from '$lib/utils';
-	import type { PlacedRoomItem, Product } from '$lib/types';
+	import type { PlacedRoomItem } from '$lib/types';
 
 	import RotateCw from '@lucide/svelte/icons/rotate-cw';
 	import Save from '@lucide/svelte/icons/save';

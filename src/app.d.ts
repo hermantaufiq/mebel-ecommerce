@@ -8,6 +8,7 @@ declare global {
 				name: string;
 				email: string;
 				role: string;
+				totalSpending: number;
 				tier: string;
 				loyaltyPoints: number;
 				createdAt: Date;

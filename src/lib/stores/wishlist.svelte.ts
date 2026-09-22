@@ -41,6 +41,18 @@ export class WishlistStore {
 		}
 	}
 
+	private syncServer(productId: string) {
+		if (browser) {
+			fetch('/api/wishlist/toggle', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ productId })
+			}).catch((err) => {
+				console.warn('Background wishlist sync error:', err);
+			});
+		}
+	}
+
 	/**
 	 * Toggle wishlist item. If item with same productId exists, removes it.
 	 * Otherwise adds it with full metadata.
@@ -48,27 +60,51 @@ export class WishlistStore {
 	 */
 	toggleWishlist(item: WishlistItem): boolean {
 		const index = this.items.findIndex((i) => i.productId === item.productId);
+		let added = false;
+
 		if (index > -1) {
 			this.items.splice(index, 1);
 			this.save();
-			return false;
+			added = false;
 		} else {
 			this.items.push({
 				...item,
 				id: item.id || item.productId
 			});
 			this.save();
-			return true;
+			added = true;
 		}
+
+		this.syncServer(item.productId);
+		return added;
 	}
 
 	removeItem(productId: string) {
+		const wasPresent = this.isWishlisted(productId);
 		this.items = this.items.filter((item) => item.productId !== productId);
 		this.save();
+
+		if (wasPresent) {
+			this.syncServer(productId);
+		}
 	}
 
 	clearWishlist() {
 		this.items = [];
+		this.save();
+	}
+
+	/**
+	 * Merge server items into client wishlist for logged-in user
+	 */
+	syncFromDatabase(serverItems: WishlistItem[]) {
+		if (!serverItems || serverItems.length === 0) return;
+
+		for (const sItem of serverItems) {
+			if (!this.isWishlisted(sItem.productId)) {
+				this.items.push(sItem);
+			}
+		}
 		this.save();
 	}
 }

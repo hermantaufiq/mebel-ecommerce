@@ -51,6 +51,7 @@
 	let errorMessage = $state('');
 	let stockNotice = $state('');
 	let isValidatingStock = $state(false);
+	let adjustedItemIds = $state<string[]>([]);
 
 	// Real-time stock validation upon opening /keranjang (tidak percaya cache localStorage murni)
 	onMount(async () => {
@@ -86,7 +87,8 @@
 			if (res.ok) {
 				const result = await res.json();
 				if (result.items) {
-					const { adjustedCount, removedCount } = cartStore.syncWithValidated(result.items);
+					const { adjustedCount, removedCount, adjustedItemIds: ids } = cartStore.syncWithValidated(result.items);
+					adjustedItemIds = ids;
 					if (removedCount > 0 || adjustedCount > 0) {
 						stockNotice = `Catatan: Ketersediaan ${adjustedCount + removedCount} produk telah diverifikasi dan disesuaikan dengan stok atelier terbaru.`;
 					}
@@ -129,7 +131,7 @@
 							paymentMethod
 						})
 					);
-				} catch (e) {}
+				} catch {}
 			}
 			goto(`/login?redirect=${encodeURIComponent('/keranjang')}&from=checkout`);
 			return;
@@ -228,6 +230,9 @@
 			<div class="mb-8 border-b border-[#E8DFD0] pb-5">
 				<h1 class="font-serif text-3xl font-bold text-[#1F1810] sm:text-4xl">
 					Keranjang Belanja &amp; Pengiriman
+					{#if isValidatingStock}
+						<span class="text-xs text-stone-400 font-normal font-sans animate-pulse ml-2">Memverifikasi stok...</span>
+					{/if}
 				</h1>
 				<p class="mt-2 text-sm text-stone-600">
 					Tinjau pilihan furnitur Anda dan tentukan jadwal perakitan langsung di lokasi.
@@ -256,6 +261,16 @@
 					>
 						Masuk / Daftar &rarr;
 					</a>
+				</div>
+			{/if}
+ 
+			{#if stockNotice}
+				<div class="mb-6 flex items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50/80 p-4 text-xs text-sky-950 shadow-2xs">
+					<div class="flex items-center gap-2.5">
+						<Info class="h-4 w-4 text-sky-600 shrink-0" />
+						<span>{stockNotice}</span>
+					</div>
+					<button type="button" onclick={() => (stockNotice = '')} class="text-sky-500 hover:text-sky-700 font-bold px-1">✕</button>
 				</div>
 			{/if}
 
@@ -308,6 +323,12 @@
 												<p class="text-xs text-stone-500 mt-0.5">
 													{item.material}
 												</p>
+											{/if}
+											{#if adjustedItemIds.includes(item.id)}
+												<div class="mt-1.5 inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-900 border border-amber-200">
+													<AlertCircle class="h-3.5 w-3.5 text-amber-600 shrink-0" />
+													<span>Jumlah disesuaikan dengan stok tersedia ({item.maxStock} unit)</span>
+												</div>
 											{/if}
 											<p class="mt-1 text-xs font-semibold text-stone-700 sm:hidden">
 												{formatRupiah(item.unitPrice)} / unit

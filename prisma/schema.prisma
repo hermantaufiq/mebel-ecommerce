@@ -17,7 +17,8 @@ model User {
   image         String?
   role          String         @default("user")
   passwordHash  String?
-  tier          String         @default("Regular") // Regular, VIP
+  totalSpending Int            @default(0)
+  tier          String         @default("Regular") // Regular, Silver, Gold, Platinum
   loyaltyPoints Int            @default(0)
   createdAt     DateTime       @default(now())
   accounts      Account[]
@@ -26,6 +27,7 @@ model User {
   orders        Order[]
   wishlist      WishlistItem[]
   cartItems     CartItem[]
+  redemptions   RewardRedemption[]
 }
 
 model Account {
@@ -171,6 +173,7 @@ model Order {
   deliveryDate    DateTime?
   deliverySlot    String?      // "Pagi (09:00-12:00)" dll
   installService  Boolean     @default(true)
+  loyaltyProcessed Boolean    @default(false)
   items           OrderItem[]
   createdAt       DateTime    @default(now())
 
@@ -186,4 +189,32 @@ model OrderItem {
   variantLabel String?
   qty          Int
   priceAtOrder Int
+}
+
+model Reward {
+  id            String             @id @default(cuid())
+  name          String             // "Voucher Potongan Rp 500.000", "Konsultasi Desain Interior Gratis"
+  description   String
+  category      String             // "voucher" | "layanan" | "garansi" | "pengiriman"
+  pointsCost    Int
+  minTier       String             @default("Regular") // "Regular" | "Silver" | "Gold" | "Platinum"
+  stock         Int?               // null = unlimited, angka = terbatas
+  isActive      Boolean            @default(true)
+  validityDays  Int?               // masa berlaku setelah diklaim dalam hari (null = tidak expire)
+  createdAt     DateTime           @default(now())
+  redemptions   RewardRedemption[]
+}
+
+model RewardRedemption {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  rewardId    String
+  reward      Reward    @relation(fields: [rewardId], references: [id])
+  pointsSpent Int
+  status      String    @default("Aktif") // "Aktif" | "Terpakai" | "Kedaluwarsa"
+  redeemedAt  DateTime  @default(now())
+  expiresAt   DateTime?
+  usedAt      DateTime?
+  voucherCode String?   @unique // kode unik untuk voucher
 }

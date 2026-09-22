@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { mockProducts, mockCategories } from '$lib/mockData';
+	import type { PageData } from './$types';
 	import { cartStore } from '$lib/stores/cart.svelte';
 	import { wishlistStore } from '$lib/stores/wishlist.svelte';
 	import { formatRupiah } from '$lib/utils';
@@ -16,12 +16,16 @@
 	import ShieldCheck from '@lucide/svelte/icons/shield-check';
 	import Hammer from '@lucide/svelte/icons/hammer';
 
-	// Featured products for preview
-	const featuredProducts = mockProducts.slice(0, 4);
+	let { data }: { data: PageData } = $props();
+
+	// Featured products from server (Prisma DB)
+	let featuredProducts = $derived(data.featuredProducts);
 
 	let addedFeedbackId = $state<string | null>(null);
 
-	function handleAddToCart(product: typeof mockProducts[0]) {
+	type FeaturedProduct = (typeof featuredProducts)[number];
+
+	function handleAddToCart(product: FeaturedProduct) {
 		cartStore.addItem({
 			productId: product.id,
 			variantId: product.variants?.[0]?.id || null,
@@ -29,7 +33,7 @@
 			image: product.images[0]?.url || '',
 			unitPrice: product.price,
 			qty: 1,
-			maxStock: 20,
+			maxStock: product.variants?.[0]?.stock ?? 20,
 			material: product.material,
 			variantLabel: product.variants?.[0]?.label || undefined,
 			slug: product.slug
@@ -43,7 +47,7 @@
 		}, 1500);
 	}
 
-	function handleToggleWishlist(product: typeof mockProducts[0]) {
+	function handleToggleWishlist(product: FeaturedProduct) {
 		wishlistStore.toggleWishlist({
 			id: product.id,
 			productId: product.id,
@@ -52,7 +56,7 @@
 			image: product.images[0]?.url || '',
 			price: product.price,
 			material: product.material,
-			category: product.categoryName
+			category: product.category?.name
 		});
 	}
 </script>
@@ -220,7 +224,7 @@
 				variant="outline"
 				class="border-border text-xs font-semibold tracking-wider uppercase hover:bg-sand/40 flex items-center gap-1.5"
 			>
-				<span>Lihat Semua ({mockProducts.length})</span>
+				<span>Lihat Semua Koleksi</span>
 				<ArrowRight class="w-3.5 h-3.5" />
 			</Button>
 		</div>
@@ -263,7 +267,7 @@
 					<div class="p-4 flex-1 flex flex-col justify-between space-y-3">
 						<div>
 							<div class="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
-								<span>{product.categoryName || 'Mebel'}</span>
+								<span>{product.category?.name || 'Mebel'}</span>
 								<div class="flex items-center gap-1 text-amber-600 font-medium">
 									<Star class="w-3 h-3 fill-amber-500 text-amber-500" />
 									<span>{product.rating}</span>

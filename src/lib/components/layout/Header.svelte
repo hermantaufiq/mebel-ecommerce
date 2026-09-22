@@ -5,6 +5,7 @@
 	import * as Sheet from '$lib/components/ui/sheet';
 	import { Badge } from '$lib/components/ui/badge';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 
 	import Search from '@lucide/svelte/icons/search';
 	import ShoppingBag from '@lucide/svelte/icons/shopping-bag';
@@ -34,12 +35,61 @@
 		}
 	}
 
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') {
+			if (isMobileOpen) isMobileOpen = false;
+			if (isSearchOpen) isSearchOpen = false;
+		}
+	}
+
+	function handleDrawerKeydown(e: KeyboardEvent) {
+		if (!isMobileOpen) return;
+		if (e.key === 'Escape') {
+			e.preventDefault();
+			isMobileOpen = false;
+			return;
+		}
+
+		if (e.key === 'Tab') {
+			const drawer = document.getElementById('mobile-drawer-content');
+			if (!drawer) return;
+			const focusableEls = drawer.querySelectorAll<HTMLElement>(
+				'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+			);
+			if (focusableEls.length === 0) return;
+
+			const firstEl = focusableEls[0];
+			const lastEl = focusableEls[focusableEls.length - 1];
+
+			if (e.shiftKey) {
+				if (document.activeElement === firstEl) {
+					e.preventDefault();
+					lastEl?.focus();
+				}
+			} else {
+				if (document.activeElement === lastEl) {
+					e.preventDefault();
+					firstEl?.focus();
+				}
+			}
+		}
+	}
+
+	let headerSearchDebounce: ReturnType<typeof setTimeout>;
+	function handleHeaderSearchInput() {
+		clearTimeout(headerSearchDebounce);
+		headerSearchDebounce = setTimeout(() => {
+			if (page.url.pathname === '/produk') {
+				goto(`/produk?q=${encodeURIComponent(searchQuery.trim())}`, { keepFocus: true });
+			}
+		}, 400);
+	}
+
 	function handleSearchSubmit(e: SubmitEvent) {
 		e.preventDefault();
 		if (searchQuery.trim()) {
 			goto(`/produk?q=${encodeURIComponent(searchQuery.trim())}`);
 			isSearchOpen = false;
-			searchQuery = '';
 		}
 	}
 
@@ -77,7 +127,7 @@
 	];
 </script>
 
-<svelte:window onscroll={handleScroll} />
+<svelte:window onscroll={handleScroll} onkeydown={handleKeydown} />
 
 <header
 	class={`sticky top-0 z-40 w-full transition-all duration-300 ${
@@ -98,7 +148,12 @@
 					>
 						<Menu class="w-5 h-5" />
 					</Sheet.Trigger>
-					<Sheet.Content side="left" class="w-[85vw] max-w-[340px] sm:w-[380px] bg-stone-warm border-r border-border p-5 sm:p-6 overflow-y-auto">
+					<Sheet.Content
+						id="mobile-drawer-content"
+						onkeydown={handleDrawerKeydown}
+						side="left"
+						class="w-[85vw] max-w-[340px] sm:w-[380px] bg-stone-warm border-r border-border p-5 sm:p-6 overflow-y-auto"
+					>
 						<Sheet.Header class="text-left border-b border-border pb-4">
 							<div class="flex items-center gap-3">
 								<div class="w-8 h-8 rounded-full bg-espresso text-stone-warm flex items-center justify-center font-serif text-sm font-bold shadow-sm shrink-0">
@@ -127,6 +182,7 @@
 								<input
 									type="text"
 									bind:value={searchQuery}
+									oninput={handleHeaderSearchInput}
 									placeholder="Cari sofa, jati, meja..."
 									class="w-full h-9 pl-8 pr-3 text-xs bg-white border border-border rounded-lg focus:outline-none focus:border-terracotta"
 								/>
@@ -340,6 +396,7 @@
 					<input
 						type="text"
 						bind:value={searchQuery}
+						oninput={handleHeaderSearchInput}
 						placeholder="Cari sofa, jati, meja..."
 						class="w-48 lg:w-60 h-8 pl-8 pr-7 text-xs bg-white border border-border rounded-full focus:outline-none focus:border-terracotta shadow-inner"
 					/>

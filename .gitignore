@@ -14,3 +14,5 @@ dist/
 _backup_nextjs/
 
 .vercel
+test-results/
+playwright-report/

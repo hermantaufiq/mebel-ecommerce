@@ -1,8 +1,9 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import type { PageData } from './$types';
 	import { wishlistStore } from '$lib/stores/wishlist.svelte';
 	import { cartStore } from '$lib/stores/cart.svelte';
-	import { products } from '$lib/mockData';
-	import type { WishlistItem, Product } from '$lib/types';
+	import type { WishlistItem } from '$lib/types';
 	import { formatRupiah } from '$lib/utils';
 	import Breadcrumb from '$lib/components/ui/breadcrumb/Breadcrumb.svelte';
 	import ProductCard from '$lib/components/product/ProductCard.svelte';
@@ -15,6 +16,14 @@
 	import Check from '@lucide/svelte/icons/check';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
+
+	let { data }: { data: PageData } = $props();
+
+	onMount(() => {
+		if (data.dbWishlistItems && data.dbWishlistItems.length > 0) {
+			wishlistStore.syncFromDatabase(data.dbWishlistItems);
+		}
+	});
 
 	// Filter & Sort State
 	let selectedCategory = $state('Semua');
@@ -56,20 +65,15 @@
 	});
 
 	function handleAddToCart(item: WishlistItem) {
-		// Find real product from mockData if available to get accurate default variant and stock
-		const originalProduct = products.find((p) => p.id === item.productId || p.slug === item.slug);
-		const defaultVariant = originalProduct?.variants?.[0];
-
 		cartStore.addItem({
 			productId: item.productId,
-			variantId: defaultVariant?.id || null,
+			variantId: null,
 			name: item.name,
 			image: item.image,
 			unitPrice: item.price,
 			qty: 1,
-			maxStock: defaultVariant?.stock || 20,
-			material: item.material || originalProduct?.material,
-			variantLabel: defaultVariant?.label,
+			maxStock: 20,
+			material: item.material,
 			slug: item.slug
 		});
 
@@ -82,23 +86,17 @@
 	function handleMoveAllToCart() {
 		if (wishlistStore.items.length === 0) return;
 
-		const cartPayloads = wishlistStore.items.map((item) => {
-			const originalProduct = products.find((p) => p.id === item.productId || p.slug === item.slug);
-			const defaultVariant = originalProduct?.variants?.[0];
-
-			return {
-				productId: item.productId,
-				variantId: defaultVariant?.id || null,
-				name: item.name,
-				image: item.image,
-				unitPrice: item.price,
-				qty: 1,
-				maxStock: defaultVariant?.stock || 20,
-				material: item.material || originalProduct?.material,
-				variantLabel: defaultVariant?.label,
-				slug: item.slug
-			};
-		});
+		const cartPayloads = wishlistStore.items.map((item) => ({
+			productId: item.productId,
+			variantId: null,
+			name: item.name,
+			image: item.image,
+			unitPrice: item.price,
+			qty: 1,
+			maxStock: 20,
+			material: item.material,
+			slug: item.slug
+		}));
 
 		cartStore.addMultipleItems(cartPayloads);
 		movedAllFeedback = true;
@@ -107,10 +105,10 @@
 		}, 3000);
 	}
 
-	// Curated recommendations (featured products not already in wishlist)
+	// Curated recommendations from Prisma DB (excluding items already in wishlist)
 	let recommendationProducts = $derived(
-		products
-			.filter((p) => !wishlistStore.isWishlisted(p.id))
+		(data.recommendations || [])
+			.filter((p: any) => !wishlistStore.isWishlisted(p.id))
 			.slice(0, 4)
 	);
 </script>

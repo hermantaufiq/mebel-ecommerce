@@ -1,6 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { prisma } from '$lib/server/prisma';
+import { getNextTierInfo } from '$lib/server/tier-config';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	// Strict auth: no bypass, no fallback to demo account
@@ -33,9 +34,43 @@ export const load: PageServerLoad = async ({ locals }) => {
 		orderBy: { isDefault: 'desc' }
 	});
 
+	// Fetch all active rewards for catalog tab
+	const rewards = await prisma.reward.findMany({
+		where: { isActive: true },
+		orderBy: [{ minTier: 'asc' }, { pointsCost: 'asc' }]
+	});
+
+	// Fetch user's redemption history
+	const redemptions = await prisma.rewardRedemption.findMany({
+		where: { userId: user.id },
+		orderBy: { redeemedAt: 'desc' },
+		include: { reward: true }
+	});
+
+	// Get fresh user data (includes latest totalSpending, tier, loyaltyPoints)
+	const freshUser = await prisma.user.findUnique({
+		where: { id: user.id },
+		select: {
+			id: true,
+			name: true,
+			email: true,
+			role: true,
+			totalSpending: true,
+			tier: true,
+			loyaltyPoints: true,
+			createdAt: true
+		}
+	});
+
+	// Calculate tier progress
+	const tierInfo = getNextTierInfo(freshUser?.totalSpending ?? 0);
+
 	return {
-		user,
+		user: freshUser ?? user,
 		orders,
-		addresses
+		addresses,
+		rewards,
+		redemptions,
+		tierInfo
 	};
 };

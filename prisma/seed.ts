@@ -468,19 +468,118 @@ async function main() {
     console.log(`✓ Created product: ${createdProduct.name}`);
   }
 
-  console.log("👤 Seeding demo VIP user...");
+  console.log("🎁 Seeding reward catalog (7 functional rewards)...");
+  // Clear existing rewards and redemptions
+  await prisma.rewardRedemption.deleteMany();
+  await prisma.reward.deleteMany();
+
+  const rewards = await Promise.all([
+    prisma.reward.create({
+      data: {
+        name: "Voucher Potongan Rp 500.000",
+        description: "Voucher diskon senilai Rp 500.000 untuk pembelian berikutnya. Berlaku 90 hari setelah ditukar.",
+        category: "voucher",
+        pointsCost: 500,
+        minTier: "Regular",
+        stock: null,
+        isActive: true,
+        validityDays: 90,
+      },
+    }),
+    prisma.reward.create({
+      data: {
+        name: "Voucher Potongan Rp 1.500.000",
+        description: "Voucher diskon premium senilai Rp 1.500.000 untuk pembelian berikutnya. Berlaku 90 hari setelah ditukar.",
+        category: "voucher",
+        pointsCost: 1200,
+        minTier: "Silver",
+        stock: null,
+        isActive: true,
+        validityDays: 90,
+      },
+    }),
+    prisma.reward.create({
+      data: {
+        name: "Konsultasi Desain Interior Personal (1 Sesi)",
+        description: "Satu sesi konsultasi desain interior personal bersama konsultan atelier kami, mencakup rencana tata letak dan rekomendasi furnitur untuk ruang Anda.",
+        category: "layanan",
+        pointsCost: 800,
+        minTier: "Silver",
+        stock: 10,
+        isActive: true,
+        validityDays: null,
+      },
+    }),
+    prisma.reward.create({
+      data: {
+        name: "Upgrade Jasa Perakitan Premium",
+        description: "Upgrade ke layanan perakitan premium — tim perakitan khusus, jadwal fleksibel, dan perlindungan lantai premium selama proses perakitan.",
+        category: "layanan",
+        pointsCost: 400,
+        minTier: "Regular",
+        stock: null,
+        isActive: true,
+        validityDays: null,
+      },
+    }),
+    prisma.reward.create({
+      data: {
+        name: "Extended Warranty +1 Tahun",
+        description: "Perpanjangan garansi struktur +1 tahun untuk 1 produk pilihan Anda, mencakup cacat bahan dan kerusakan struktural.",
+        category: "garansi",
+        pointsCost: 1000,
+        minTier: "Gold",
+        stock: null,
+        isActive: true,
+        validityDays: null,
+      },
+    }),
+    prisma.reward.create({
+      data: {
+        name: "Prioritas Slot Pengiriman",
+        description: "Pilih tanggal pengiriman apa pun yang Anda inginkan tanpa batasan slot yang tersedia — prioritas jadwal atelier untuk Anda.",
+        category: "pengiriman",
+        pointsCost: 300,
+        minTier: "Regular",
+        stock: null,
+        isActive: true,
+        validityDays: null,
+      },
+    }),
+    prisma.reward.create({
+      data: {
+        name: "Gratis Ongkir Luar Jabodetabek (1x)",
+        description: "Gratis biaya pengiriman untuk 1 pesanan ke luar area Jabodetabek (Bandung, Surabaya, Yogyakarta, dan kota besar lainnya).",
+        category: "pengiriman",
+        pointsCost: 600,
+        minTier: "Silver",
+        stock: null,
+        isActive: true,
+        validityDays: null,
+      },
+    }),
+  ]);
+  console.log(`✓ Created ${rewards.length} rewards`);
+
+  console.log("👤 Seeding demo Silver user (Dian Sastrowardoyo)...");
   const hashedPassword = bcrypt.hashSync("demo1234", 10);
-  await prisma.user.upsert({
+  // Demo user has totalSpending = Rp 28.500.000 -> Silver tier (10jt-50jt)
+  // loyaltyPoints = Math.floor(28_500_000 / 100_000) = 285 earned, minus 0 redeemed
+  const demoUser = await prisma.user.upsert({
     where: { email: "dian.sastro@example.com" },
     update: {
       passwordHash: hashedPassword,
+      totalSpending: 28_500_000,
+      tier: "Silver",
+      loyaltyPoints: 285,
     },
     create: {
       name: "Dian Sastrowardoyo",
       email: "dian.sastro@example.com",
       passwordHash: hashedPassword,
-      tier: "VIP",
-      loyaltyPoints: 1250,
+      totalSpending: 28_500_000,
+      tier: "Silver",
+      loyaltyPoints: 285,
       addresses: {
         create: {
           recipient: "Dian Sastrowardoyo",
@@ -491,6 +590,70 @@ async function main() {
       },
     },
   });
+  console.log(`✓ Demo user: ${demoUser.name} (${demoUser.tier}, ${demoUser.loyaltyPoints} pts, totalSpending: Rp ${demoUser.totalSpending.toLocaleString("id-ID")})`);
+
+  console.log("📦 Seeding demo orders for Dian Sastrowardoyo...");
+  await prisma.orderItem.deleteMany({ where: { order: { userId: demoUser.id } } });
+  await prisma.order.deleteMany({ where: { userId: demoUser.id } });
+
+  const sampleProducts = await prisma.product.findMany({ take: 2 });
+
+  if (sampleProducts.length > 0) {
+    // 1. Completed order (contributes Rp 28.500.000 to totalSpending & 285 points)
+    await prisma.order.create({
+      data: {
+        orderNumber: "ML-2026-08129",
+        userId: demoUser.id,
+        status: "Selesai",
+        loyaltyProcessed: true,
+        subtotal: 28_500_000,
+        total: 28_500_000,
+        paymentMethod: "Transfer Bank BCA",
+        paymentStatus: "Lunas",
+        recipientName: "Dian Sastrowardoyo",
+        shippingAddress: "Jl. Senopati Raya No. 42, Kebayoran Baru, Jakarta Selatan 12190",
+        items: {
+          create: [
+            {
+              productId: sampleProducts[0].id,
+              qty: 1,
+              priceAtOrder: 28_500_000,
+              variantLabel: "Solid Teak / Natural Matte",
+            },
+          ],
+        },
+      },
+    });
+
+    // 2. Active in-transit order (ready for user to test 'Konfirmasi Pesanan Diterima')
+    if (sampleProducts.length > 1) {
+      await prisma.order.create({
+        data: {
+          orderNumber: "ML-2026-09201",
+          userId: demoUser.id,
+          status: "Dikirim",
+          loyaltyProcessed: false,
+          subtotal: 4_200_000,
+          total: 4_200_000,
+          paymentMethod: "QRIS",
+          paymentStatus: "Lunas",
+          recipientName: "Dian Sastrowardoyo",
+          shippingAddress: "Jl. Senopati Raya No. 42, Kebayoran Baru, Jakarta Selatan 12190",
+          items: {
+            create: [
+              {
+                productId: sampleProducts[1].id,
+                qty: 1,
+                priceAtOrder: 4_200_000,
+                variantLabel: "Standard Edition",
+              },
+            ],
+          },
+        },
+      });
+    }
+    console.log("✓ Created demo orders (1 Selesai with loyalty processed, 1 Dikirim ready to confirm)");
+  }
 
   console.log("✨ Seeding completed successfully!");
 }
@@ -503,3 +666,4 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+

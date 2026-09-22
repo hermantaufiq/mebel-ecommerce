@@ -136,10 +136,29 @@ export class RoomPlannerStore {
 		this.roomType = type;
 		this.selectedInstanceId = null;
 
+		const getProduct = (id: string, fallbackIndex = 0): Product => {
+			const found = products.find((p) => p.id === id) ?? products[fallbackIndex];
+			if (found) return found;
+			return {
+				id: 'fallback',
+				name: 'Furnitur Atelier',
+				slug: 'furnitur-atelier',
+				description: '',
+				price: 1000000,
+				material: 'Jati Solid',
+				status: 'Ready Stock',
+				rating: 5,
+				reviewCount: 1,
+				images: [{ id: '1', url: '', sortOrder: 0 }],
+				variants: [],
+				categoryId: 'cat-ruang-tamu'
+			};
+		};
+
 		if (type === 'ruang-tamu') {
-			const armchair = products.find((p) => p.id === 'prod-1') || products[0];
-			const lounge = products.find((p) => p.id === 'prod-2') || products[1];
-			const coffeeTable = products.find((p) => p.id === 'prod-3') || products[2];
+			const armchair = getProduct('prod-1', 0);
+			const lounge = getProduct('prod-2', 1);
+			const coffeeTable = getProduct('prod-3', 2);
 
 			this.placedItems = [
 				{
@@ -174,9 +193,9 @@ export class RoomPlannerStore {
 				}
 			];
 		} else if (type === 'kamar-tidur') {
-			const bed = products.find((p) => p.id === 'prod-5') || products[4] || products[0];
-			const nightstand = products.find((p) => p.id === 'prod-6') || products[5] || products[1];
-			const lamp = products.find((p) => p.id === 'prod-9') || products[8] || products[2];
+			const bed = getProduct('prod-5', 4);
+			const nightstand = getProduct('prod-6', 5);
+			const lamp = getProduct('prod-9', 8);
 
 			this.placedItems = [
 				{
@@ -211,9 +230,9 @@ export class RoomPlannerStore {
 				}
 			];
 		} else if (type === 'ruang-makan') {
-			const table = products.find((p) => p.id === 'prod-7') || products[6] || products[0];
-			const chair1 = products.find((p) => p.id === 'prod-8') || products[7] || products[1];
-			const chair2 = products.find((p) => p.id === 'prod-8') || products[7] || products[1];
+			const table = getProduct('prod-7', 6);
+			const chair1 = getProduct('prod-8', 7);
+			const chair2 = getProduct('prod-8', 7);
 
 			this.placedItems = [
 				{

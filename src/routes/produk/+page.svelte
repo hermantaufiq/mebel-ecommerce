@@ -1,9 +1,7 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
-	import { products, categories, materialOptions } from '$lib/mockData';
-	import type { Product } from '$lib/types';
-	import { formatRupiah } from '$lib/utils';
+	import { page } from '$app/stores';
 	import ProductCard from '$lib/components/product/ProductCard.svelte';
 	import Breadcrumb from '$lib/components/ui/breadcrumb/Breadcrumb.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -19,10 +17,11 @@
 	import Search from '@lucide/svelte/icons/search';
 	import PackageOpen from '@lucide/svelte/icons/package-open';
 
-	const ITEMS_PER_PAGE = 12;
+	let { data }: { data: PageData } = $props();
 
 	const rooms = ['Ruang Tamu', 'Kamar Tidur', 'Ruang Makan', 'Ruang Kerja', 'Pencahayaan', 'Dekorasi'] as const;
 	const statusOptions = ['Ready Stock', 'Pre-Order', 'Bestseller', 'Terbatas'] as const;
+	const materialOptions = ['Jati', 'Rotan', 'Bambu', 'MDF', 'Besi', 'Kain', 'Kulit'];
 	const priceRanges = [
 		{ label: '< Rp 5 Juta', min: 0, max: 5000000 },
 		{ label: 'Rp 5 - 10 Juta', min: 5000000, max: 10000000 },
@@ -37,119 +36,43 @@
 		{ value: 'nama', label: 'Nama A-Z' }
 	];
 
-	// --- State from URL params ---
+	// --- Local UI state (initialized from server data.filters) ---
 	let selectedRooms = $state<string[]>([]);
 	let selectedCategories = $state<string[]>([]);
 	let selectedMaterials = $state<string[]>([]);
 	let selectedStatuses = $state<string[]>([]);
 	let selectedPriceRange = $state<number | null>(null);
 	let sortBy = $state('terbaru');
-	let currentPage = $state(1);
 	let searchQuery = $state('');
 	let mobileFilterOpen = $state(false);
 
-	// Read initial URL params
+	// Sync from server data on page load / navigation
 	$effect(() => {
-		const params = $page.url.searchParams;
-		const kategori = params.get('kategori');
-		if (kategori) {
-			// Try matching as room slug
-			const matchRoom = rooms.find(r => r.toLowerCase().replace(/\s+/g, '-') === kategori);
-			if (matchRoom) {
-				selectedRooms = [matchRoom];
-			} else {
-				// Try matching as category slug
-				const matchCat = categories.find(c => c.slug === kategori);
-				if (matchCat) {
-					selectedCategories = [matchCat.id];
-				}
-			}
-		}
-		const sort = params.get('sort');
-		if (sort && sortOptions.some(s => s.value === sort)) {
-			sortBy = sort;
-		}
-		const pg = params.get('page');
-		if (pg && !isNaN(Number(pg))) {
-			currentPage = Math.max(1, Number(pg));
-		}
-		const q = params.get('q');
-		if (q) {
-			searchQuery = q;
+		const filters = data.filters;
+		searchQuery = filters.q ?? '';
+		sortBy = filters.sort ?? 'terbaru';
+		selectedMaterials = filters.materials ?? [];
+		selectedStatuses = filters.statuses ?? [];
+
+		// Parse price range from min/max
+		if (filters.priceMin || filters.priceMax) {
+			const idx = priceRanges.findIndex(
+				(r) =>
+					String(r.min) === filters.priceMin &&
+					(r.max === Infinity ? !filters.priceMax : String(r.max) === filters.priceMax)
+			);
+			selectedPriceRange = idx >= 0 ? idx : null;
+		} else {
+			selectedPriceRange = null;
 		}
 	});
 
-	// --- Derived: filtered & sorted products ---
-	let filteredProducts = $derived.by(() => {
-		let result = [...products];
-
-		// Search
-		if (searchQuery.trim()) {
-			const q = searchQuery.toLowerCase().trim();
-			result = result.filter(p =>
-				p.name.toLowerCase().includes(q) ||
-				p.material.toLowerCase().includes(q) ||
-				(p.description && p.description.toLowerCase().includes(q)) ||
-				(p.categoryName && p.categoryName.toLowerCase().includes(q))
-			);
-		}
-
-		// Room filter
-		if (selectedRooms.length > 0) {
-			result = result.filter(p => p.room && selectedRooms.includes(p.room));
-		}
-
-		// Category filter
-		if (selectedCategories.length > 0) {
-			result = result.filter(p => selectedCategories.includes(p.categoryId));
-		}
-
-		// Material filter
-		if (selectedMaterials.length > 0) {
-			result = result.filter(p =>
-				selectedMaterials.some(m => p.material.toLowerCase().includes(m.toLowerCase()))
-			);
-		}
-
-		// Status filter
-		if (selectedStatuses.length > 0) {
-			result = result.filter(p => selectedStatuses.includes(p.status));
-		}
-
-		// Price range filter
-		if (selectedPriceRange !== null) {
-			const range = priceRanges[selectedPriceRange];
-			if (range) {
-				result = result.filter(p => p.price >= range.min && p.price < range.max);
-			}
-		}
-
-		// Sort
-		switch (sortBy) {
-			case 'harga-asc':
-				result.sort((a, b) => a.price - b.price);
-				break;
-			case 'harga-desc':
-				result.sort((a, b) => b.price - a.price);
-				break;
-			case 'rating':
-				result.sort((a, b) => b.rating - a.rating);
-				break;
-			case 'nama':
-				result.sort((a, b) => a.name.localeCompare(b.name));
-				break;
-			default:
-				// terbaru — keep original order (mock default)
-				break;
-		}
-
-		return result;
-	});
-
-	let totalPages = $derived(Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE)));
-	let paginatedProducts = $derived(
-		filteredProducts.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
-	);
+	// --- Data from server ---
+	let products = $derived(data.products);
+	let categories = $derived(data.categories);
+	let totalPages = $derived(data.totalPages);
+	let currentPage = $derived(data.currentPage);
+	let totalCount = $derived(data.totalCount);
 
 	let activeFilterCount = $derived(
 		selectedRooms.length +
@@ -166,43 +89,78 @@
 		return categories.filter(c => selectedRooms.includes(c.room));
 	});
 
+	// --- URL Navigation helpers ---
+	function buildSearchParams(overrides: Record<string, string | string[] | number | null> = {}): string {
+		const params = new URLSearchParams();
+		const q = 'q' in overrides ? overrides['q'] : searchQuery;
+		const sort = 'sort' in overrides ? overrides['sort'] : sortBy;
+		const mats = 'materials' in overrides ? overrides['materials'] : selectedMaterials;
+		const stats = 'statuses' in overrides ? overrides['statuses'] : selectedStatuses;
+		const priceIdx = 'priceRange' in overrides ? overrides['priceRange'] : selectedPriceRange;
+		const pg = 'page' in overrides ? overrides['page'] : '1';
+		const kat = 'kategori' in overrides ? overrides['kategori'] : ($page.url.searchParams.get('kategori') ?? '');
+
+		if (typeof q === 'string' && q.trim()) params.set('q', q.trim());
+		if (typeof sort === 'string' && sort !== 'terbaru') params.set('sort', sort);
+		if (Array.isArray(mats)) mats.forEach(m => params.append('material', m));
+		if (Array.isArray(stats)) stats.forEach(s => params.append('status', s));
+		if (typeof kat === 'string' && kat) params.set('kategori', kat);
+
+		if (priceIdx !== null && typeof priceIdx === 'number') {
+			const range = priceRanges[priceIdx];
+			if (range) {
+				params.set('price_min', String(range.min));
+				if (range.max !== Infinity) params.set('price_max', String(range.max));
+			}
+		}
+		const pageNum = typeof pg === 'string' ? pg : String(pg ?? 1);
+		if (pageNum && pageNum !== '1') params.set('page', pageNum);
+		return `?${params.toString()}`;
+	}
+
+	function navigate(overrides: Record<string, string | string[] | number | null> = {}) {
+		goto(`/produk${buildSearchParams(overrides)}`, { keepFocus: true });
+	}
+
 	function toggleArrayItem(arr: string[], item: string): string[] {
 		return arr.includes(item) ? arr.filter(i => i !== item) : [...arr, item];
 	}
 
 	function handleRoomToggle(room: string) {
-		selectedRooms = toggleArrayItem(selectedRooms, room);
-		// Clear selected categories that no longer match
-		if (selectedRooms.length > 0) {
-			const validCatIds = categories.filter(c => selectedRooms.includes(c.room)).map(c => c.id);
-			selectedCategories = selectedCategories.filter(id => validCatIds.includes(id));
-		}
-		currentPage = 1;
+		const newRooms = toggleArrayItem(selectedRooms, room);
+		selectedRooms = newRooms;
+		// Navigate with room as kategori
+		const roomSlug = room.toLowerCase().replace(/\s+/g, '-');
+		navigate({ kategori: newRooms.includes(room) ? roomSlug : '' });
 	}
 
 	function handleCategoryToggle(catId: string) {
-		selectedCategories = toggleArrayItem(selectedCategories, catId);
-		currentPage = 1;
+		const cat = categories.find(c => c.id === catId);
+		if (!cat) return;
+		navigate({ kategori: cat.slug });
 	}
 
 	function handleMaterialToggle(material: string) {
-		selectedMaterials = toggleArrayItem(selectedMaterials, material);
-		currentPage = 1;
+		const newMats = toggleArrayItem(selectedMaterials, material);
+		selectedMaterials = newMats;
+		navigate({ materials: newMats });
 	}
 
 	function handleStatusToggle(status: string) {
-		selectedStatuses = toggleArrayItem(selectedStatuses, status);
-		currentPage = 1;
+		const newStats = toggleArrayItem(selectedStatuses, status);
+		selectedStatuses = newStats;
+		navigate({ statuses: newStats });
 	}
 
 	function handlePriceRange(index: number) {
-		selectedPriceRange = selectedPriceRange === index ? null : index;
-		currentPage = 1;
+		const newIdx = selectedPriceRange === index ? null : index;
+		selectedPriceRange = newIdx;
+		navigate({ priceRange: newIdx });
 	}
 
 	function handleSort(value: string) {
 		sortBy = value;
-		currentPage = 1;
+		navigate({ sort: value });
 	}
 
 	function resetFilters() {
@@ -212,13 +170,22 @@
 		selectedStatuses = [];
 		selectedPriceRange = null;
 		searchQuery = '';
-		currentPage = 1;
 		sortBy = 'terbaru';
+		goto('/produk');
 	}
 
 	function goToPage(pg: number) {
-		currentPage = Math.max(1, Math.min(pg, totalPages));
+		const safe = Math.max(1, Math.min(pg, totalPages));
+		navigate({ page: String(safe) });
 		window.scrollTo({ top: 0, behavior: 'smooth' });
+	}
+
+	let searchDebounce: ReturnType<typeof setTimeout>;
+	function handleSearchInput() {
+		clearTimeout(searchDebounce);
+		searchDebounce = setTimeout(() => {
+			navigate({ q: searchQuery });
+		}, 400);
 	}
 </script>
 
@@ -237,7 +204,7 @@
 			Katalog Koleksi
 		</h1>
 		<p class="text-sm text-muted-foreground mt-1">
-			Temukan {filteredProducts.length} karya mebel premium dari atelier kami
+			Temukan {totalCount} karya mebel premium dari atelier kami
 		</p>
 	</div>
 
@@ -273,6 +240,7 @@
 					<input
 						type="text"
 						bind:value={searchQuery}
+						oninput={handleSearchInput}
 						placeholder="Cari di katalog..."
 						class="w-full h-9 pl-8 pr-3 text-xs bg-white border border-border rounded-lg focus:outline-none focus:border-terracotta transition-colors"
 					/>
@@ -280,7 +248,7 @@
 					{#if searchQuery}
 						<button
 							type="button"
-							onclick={() => { searchQuery = ''; currentPage = 1; }}
+							onclick={() => { searchQuery = ''; navigate({ q: '' }); }}
 							class="absolute right-2 top-2 text-muted-foreground hover:text-espresso"
 						>
 							<X class="w-3.5 h-3.5" />
@@ -329,7 +297,7 @@
 									{/if}
 								</div>
 								<Sheet.Description class="text-xs text-muted-foreground">
-									{filteredProducts.length} produk ditemukan
+									{totalCount} produk ditemukan
 								</Sheet.Description>
 							</Sheet.Header>
 							<div class="py-4 space-y-5">
@@ -341,7 +309,7 @@
 									onclick={() => { mobileFilterOpen = false; }}
 									class="w-full h-10 bg-espresso text-white text-xs font-semibold tracking-wider uppercase rounded-lg hover:bg-terracotta transition-colors"
 								>
-									Tampilkan {filteredProducts.length} Produk
+									Tampilkan {totalCount} Produk
 								</button>
 							</div>
 						</Sheet.Content>
@@ -350,7 +318,7 @@
 
 				<!-- Product Count -->
 				<span class="hidden sm:block text-xs text-muted-foreground">
-					Menampilkan {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredProducts.length)} dari {filteredProducts.length} produk
+					{products.length} dari {totalCount} produk
 				</span>
 
 				<!-- Sort Dropdown -->
@@ -378,9 +346,9 @@
 			</div>
 
 			<!-- Product Grid -->
-			{#if paginatedProducts.length > 0}
+			{#if products.length > 0}
 				<div class="grid grid-cols-1 min-[420px]:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
-					{#each paginatedProducts as product (product.id)}
+					{#each products as product (product.id)}
 						<ProductCard {product} />
 					{/each}
 				</div>
@@ -461,7 +429,6 @@
 		<div class="space-y-1.5">
 			{#each rooms as room}
 				{@const isActive = selectedRooms.includes(room)}
-				{@const count = products.filter(p => p.room === room).length}
 				<label class="flex items-center gap-2.5 cursor-pointer group">
 					<input
 						type="checkbox"
@@ -472,7 +439,6 @@
 					<span class={`text-xs transition-colors ${isActive ? 'text-espresso font-medium' : 'text-muted-foreground group-hover:text-espresso'}`}>
 						{room}
 					</span>
-					<span class="text-[10px] text-muted-foreground/60 ml-auto">({count})</span>
 				</label>
 			{/each}
 		</div>
@@ -528,18 +494,17 @@
 		<h3 class="text-xs font-semibold text-espresso uppercase tracking-wider">Material</h3>
 		<div class="space-y-1.5">
 			{#each materialOptions as mat}
-				{@const isActive = selectedMaterials.includes(mat.label)}
+				{@const isActive = selectedMaterials.includes(mat)}
 				<label class="flex items-center gap-2.5 cursor-pointer group">
 					<input
 						type="checkbox"
 						checked={isActive}
-						onchange={() => handleMaterialToggle(mat.label)}
+						onchange={() => handleMaterialToggle(mat)}
 						class="w-4 h-4 rounded border-border text-terracotta focus:ring-terracotta/50 accent-terracotta"
 					/>
 					<span class={`text-xs transition-colors ${isActive ? 'text-espresso font-medium' : 'text-muted-foreground group-hover:text-espresso'}`}>
-						{mat.label}
+						{mat}
 					</span>
-					<span class="text-[10px] text-muted-foreground/60 ml-auto">({mat.count})</span>
 				</label>
 			{/each}
 		</div>
@@ -551,7 +516,6 @@
 		<div class="space-y-1.5">
 			{#each statusOptions as status}
 				{@const isActive = selectedStatuses.includes(status)}
-				{@const count = products.filter(p => p.status === status).length}
 				<label class="flex items-center gap-2.5 cursor-pointer group">
 					<input
 						type="checkbox"
@@ -562,7 +526,6 @@
 					<span class={`text-xs transition-colors ${isActive ? 'text-espresso font-medium' : 'text-muted-foreground group-hover:text-espresso'}`}>
 						{status}
 					</span>
-					<span class="text-[10px] text-muted-foreground/60 ml-auto">({count})</span>
 				</label>
 			{/each}
 		</div>

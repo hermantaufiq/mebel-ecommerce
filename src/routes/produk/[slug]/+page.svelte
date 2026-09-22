@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { page } from '$app/stores';
-	import { products, categories } from '$lib/mockData';
-	import type { Product, ProductVariant } from '$lib/types';
+	import type { PageData } from './$types';
+	import type { ProductVariant } from '$lib/types';
 	import { cartStore } from '$lib/stores/cart.svelte';
 	import { wishlistStore } from '$lib/stores/wishlist.svelte';
 	import { formatRupiah } from '$lib/utils';
 	import Breadcrumb from '$lib/components/ui/breadcrumb/Breadcrumb.svelte';
 	import ProductCard from '$lib/components/product/ProductCard.svelte';
+	import SeoHead from '$lib/components/seo/SeoHead.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 
 	import Star from '@lucide/svelte/icons/star';
@@ -21,8 +21,22 @@
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 	import Ruler from '@lucide/svelte/icons/ruler';
 
-	// Reactive product retrieval based on current slug
-	let product = $derived(products.find((p) => p.slug === $page.params.slug));
+	let { data }: { data: PageData } = $props();
+
+	// Product from server (Prisma DB)
+	let product = $derived(data.product);
+	let relatedProductsData = $derived(data.relatedProducts);
+
+	// Cast Prisma Json fields to typed interfaces for safe access
+	type ProductAttributesLocal = {
+		seatHeight?: string; cushionDensity?: string; frameConstruction?: string;
+		fabricType?: string; finish?: string; woodOrigin?: string;
+		[key: string]: unknown;
+	};
+	type DimensionsLocal = { panjang?: number; lebar?: number; tinggi?: number };
+
+	let attrs = $derived(product.attributes as ProductAttributesLocal | null);
+	let dims = $derived(product.dimensions as DimensionsLocal | null);
 
 	// Active selected image index
 	let activeImageIndex = $state(0);
@@ -33,7 +47,7 @@
 	// Reset / initialize variant when product changes
 	$effect(() => {
 		if (product && product.variants && product.variants.length > 0) {
-			selectedVariantId = product.variants[0].id;
+			selectedVariantId = product.variants[0]?.id ?? null;
 			activeImageIndex = 0;
 			qty = 1;
 		}
@@ -101,20 +115,12 @@
 		});
 	}
 
-	// Related products: same category, excluding current product
-	let relatedProducts = $derived(
-		product
-			? products
-					.filter((p) => p.categoryId === product?.categoryId && p.id !== product?.id)
-					.slice(0, 4)
-			: []
-	);
+	// Related products from server
+	let relatedProducts = $derived(relatedProductsData);
 
-	// Fallback category name if not populated
+	// Fallback category name
 	let categoryName = $derived(
-		product?.categoryName ||
-			categories.find((c) => c.id === product?.categoryId)?.name ||
-			'Koleksi'
+		product?.category?.name || 'Koleksi'
 	);
 
 	// Group variants by type if multiple types exist
@@ -143,12 +149,13 @@
 	}
 </script>
 
-<svelte:head>
-	<title>{product ? `${product.name} | Maison Lumina` : 'Produk Tidak Ditemukan | Maison Lumina'}</title>
-	{#if product}
-		<meta name="description" content={product.description} />
-	{/if}
-</svelte:head>
+<SeoHead
+	title={product.name}
+	description={product.description}
+	image={product.images[0]?.url}
+	type="product"
+	jsonLd={data.jsonLd}
+/>
 
 <div class="min-h-screen bg-[#F7F3EC] py-6 sm:py-10">
 	<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -189,6 +196,7 @@
 								src={product.images[activeImageIndex]?.url || product.images[0]?.url}
 								alt={product.images[activeImageIndex]?.altText || product.name}
 								class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+								loading="eager"
 							/>
 
 							<!-- Status Badge -->
@@ -234,6 +242,7 @@
 											src={img.url}
 											alt={img.altText || `${product.name} foto ${i + 1}`}
 											class="h-full w-full object-cover"
+											loading="lazy"
 										/>
 									</button>
 								{/each}
@@ -252,55 +261,55 @@
 							<div class="grid grid-cols-3 gap-4 border-y border-[#E8DFD0] py-4 text-center">
 								<div>
 									<span class="block text-xs uppercase tracking-wider text-stone-500 font-medium">Panjang</span>
-									<span class="text-base font-semibold text-[#1F1810]">{product.dimensions.panjang} cm</span>
+									<span class="text-base font-semibold text-[#1F1810]">{dims?.panjang} cm</span>
 								</div>
 								<div class="border-x border-[#E8DFD0]">
 									<span class="block text-xs uppercase tracking-wider text-stone-500 font-medium">Lebar</span>
-									<span class="text-base font-semibold text-[#1F1810]">{product.dimensions.lebar} cm</span>
+									<span class="text-base font-semibold text-[#1F1810]">{dims?.lebar} cm</span>
 								</div>
 								<div>
 									<span class="block text-xs uppercase tracking-wider text-stone-500 font-medium">Tinggi</span>
-									<span class="text-base font-semibold text-[#1F1810]">{product.dimensions.tinggi} cm</span>
+									<span class="text-base font-semibold text-[#1F1810]">{dims?.tinggi} cm</span>
 								</div>
 							</div>
 						{/if}
 
-						{#if product.attributes}
+						{#if attrs}
 							<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 text-sm text-stone-700">
-								{#if product.attributes.fabricType}
+								{#if attrs.fabricType}
 									<div class="flex justify-between py-1 border-b border-[#E8DFD0]/40">
 										<span class="text-stone-500">Bahan Kain</span>
-										<span class="font-medium text-[#1F1810]">{product.attributes.fabricType}</span>
+										<span class="font-medium text-[#1F1810]">{attrs.fabricType}</span>
 									</div>
 								{/if}
-								{#if product.attributes.frameConstruction}
+								{#if attrs.frameConstruction}
 									<div class="flex justify-between py-1 border-b border-[#E8DFD0]/40">
 										<span class="text-stone-500">Konstruksi</span>
-										<span class="font-medium text-[#1F1810]">{product.attributes.frameConstruction}</span>
+										<span class="font-medium text-[#1F1810]">{attrs.frameConstruction}</span>
 									</div>
 								{/if}
-								{#if product.attributes.cushionDensity}
+								{#if attrs.cushionDensity}
 									<div class="flex justify-between py-1 border-b border-[#E8DFD0]/40">
 										<span class="text-stone-500">Kepadatan Busa</span>
-										<span class="font-medium text-[#1F1810]">{product.attributes.cushionDensity}</span>
+										<span class="font-medium text-[#1F1810]">{attrs.cushionDensity}</span>
 									</div>
 								{/if}
-								{#if product.attributes.seatHeight}
+								{#if attrs.seatHeight}
 									<div class="flex justify-between py-1 border-b border-[#E8DFD0]/40">
 										<span class="text-stone-500">Tinggi Dudukan</span>
-										<span class="font-medium text-[#1F1810]">{product.attributes.seatHeight}</span>
+										<span class="font-medium text-[#1F1810]">{attrs.seatHeight}</span>
 									</div>
 								{/if}
-								{#if product.attributes.finish}
+								{#if attrs.finish}
 									<div class="flex justify-between py-1 border-b border-[#E8DFD0]/40">
 										<span class="text-stone-500">Finishing</span>
-										<span class="font-medium text-[#1F1810]">{product.attributes.finish}</span>
+										<span class="font-medium text-[#1F1810]">{attrs.finish}</span>
 									</div>
 								{/if}
-								{#if product.attributes.woodOrigin}
+								{#if attrs.woodOrigin}
 									<div class="flex justify-between py-1 border-b border-[#E8DFD0]/40">
 										<span class="text-stone-500">Asal Kayu</span>
-										<span class="font-medium text-[#1F1810]">{product.attributes.woodOrigin}</span>
+										<span class="font-medium text-[#1F1810]">{attrs.woodOrigin}</span>
 									</div>
 								{/if}
 							</div>
@@ -354,11 +363,6 @@
 							{/if}
 						</div>
 
-						{#if product.statusDetail}
-							<p class="mt-1 text-xs text-stone-500 italic">
-								{product.statusDetail}
-							</p>
-						{/if}
 					</div>
 
 					<hr class="border-[#E8DFD0]" />

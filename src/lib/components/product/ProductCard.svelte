@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { Product } from '$lib/types';
 	import { cartStore } from '$lib/stores/cart.svelte';
 	import { wishlistStore } from '$lib/stores/wishlist.svelte';
 	import { formatRupiah } from '$lib/utils';
@@ -10,7 +9,25 @@
 	import Star from '@lucide/svelte/icons/star';
 	import Check from '@lucide/svelte/icons/check';
 
-	let { product }: { product: Product } = $props();
+	// Structural type — compatible with Prisma results AND mock Product
+	interface ProductCardData {
+		id: string;
+		name: string;
+		slug: string;
+		price: number;
+		material: string;
+		status: string;
+		rating: number;
+		reviewCount: number;
+		images: { id?: string; url: string; altText?: string | null; sortOrder?: number }[];
+		variants: { id: string; stock: number; label?: string; priceOffset?: number }[];
+		categoryName?: string;
+		room?: string;
+		colorSwatches?: string[];
+		category?: { name: string } | null;
+	}
+
+	let { product }: { product: ProductCardData } = $props();
 
 	let addedFeedback = $state(false);
 
@@ -110,7 +127,7 @@
 	<div class="p-4 flex-1 flex flex-col justify-between space-y-2.5">
 		<div>
 			<div class="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
-				<span class="truncate">{product.categoryName || product.room || 'Mebel'}</span>
+				<span class="truncate">{product.categoryName || product.category?.name || product.room || 'Mebel'}</span>
 				{#if product.rating}
 					<div class="flex items-center gap-1 text-amber-600 font-medium shrink-0">
 						<Star class="w-3 h-3 fill-amber-500 text-amber-500" />

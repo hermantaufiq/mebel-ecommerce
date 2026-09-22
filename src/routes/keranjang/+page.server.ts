@@ -2,7 +2,7 @@ import type { PageServerLoad } from './$types';
 import { prisma } from '$lib/server/prisma';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	let user = locals.user;
+	const user = locals.user;
 	let defaultAddress = null;
 
 	if (user) {
