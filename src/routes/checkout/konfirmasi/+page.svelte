@@ -16,10 +16,18 @@
 	import Wrench from '@lucide/svelte/icons/wrench';
 	import Calendar from '@lucide/svelte/icons/calendar';
 
+	import { invalidateAll } from '$app/navigation';
+	import Award from '@lucide/svelte/icons/award';
+	import FileText from '@lucide/svelte/icons/file-text';
+	import { toast } from '$lib/utils/toast';
+
 	let { data }: { data: PageData } = $props();
 	let order = $derived(data.order);
 
 	let copied = $state(false);
+	let isCompleting = $state(false);
+
+	const earnedPoints = $derived(Math.max(0, Math.floor(order.total / 100_000)));
 
 	function copyOrderNumber() {
 		if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -34,6 +42,40 @@
 	function handlePrint() {
 		if (typeof window !== 'undefined') {
 			window.print();
+		}
+	}
+
+	// Koreksi 4: Reuse endpoint /api/orders/[id]/complete yang sudah teruji
+	async function handleConfirmReceipt() {
+		if (isCompleting) return;
+
+		const confirmed = confirm(
+			`Konfirmasi penerimaan pesanan #${order.orderNumber}? Status pesanan akan diselesaikan dan ${earnedPoints} poin loyalitas akan ditambahkan ke akun Anda.`
+		);
+		if (!confirmed) return;
+
+		isCompleting = true;
+		try {
+			const res = await fetch(`/api/orders/${order.id}/complete`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' }
+			});
+			const result = await res.json();
+
+			if (!res.ok) {
+				toast.error(result.error || 'Gagal mengonfirmasi pesanan selesai');
+				return;
+			}
+
+			await invalidateAll();
+			toast.success(
+				`Pesanan #${order.orderNumber} berhasil diselesaikan! Poin loyalitas +${result.result?.pointsAwarded ?? earnedPoints} telah ditambahkan.`
+			);
+		} catch (err: any) {
+			console.error('Error completing order:', err);
+			toast.error('Terjadi kesalahan sistem saat menyelesaikan pesanan.');
+		} finally {
+			isCompleting = false;
 		}
 	}
 </script>
@@ -95,8 +137,57 @@
 			</div>
 		</div>
 
+		<!-- Loyalty Points Accrual & Status Alert -->
+		<div class="my-6 rounded-2xl border border-[#E8DFD0] bg-white p-5 shadow-sm">
+			<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+				<div class="flex items-center gap-3">
+					<div class="flex h-11 w-11 items-center justify-center rounded-xl bg-[#FAF8F5] text-[#B5652F] border border-[#E8DFD0]">
+						<Award class="h-6 w-6" />
+					</div>
+					<div>
+						<span class="text-[11px] font-semibold uppercase tracking-wider text-stone-500 block">
+							Poin Loyalitas Pesanan
+						</span>
+						<span class="font-serif text-base font-bold text-[#1F1810]">
+							+{earnedPoints.toLocaleString('id-ID')} Poin Maison Lumina
+						</span>
+						<span class="text-[11px] text-stone-500 block">
+							(Akrual otomatis 1 poin per kelipatan Rp 100.000 setelah pesanan diterima)
+						</span>
+					</div>
+				</div>
+
+				{#if order.status === 'Selesai' || order.loyaltyProcessed}
+					<div class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3.5 py-1 text-xs font-semibold text-emerald-800 border border-emerald-200">
+						<CheckCircle2 class="h-4 w-4 text-emerald-600" />
+						<span>Poin Telah Masuk ke Akun Anda</span>
+					</div>
+				{:else if order.status === 'Dikirim'}
+					<!-- Koreksi 4: Tombol Konfirmasi Diterima mereuse /api/orders/[id]/complete -->
+					<button
+						type="button"
+						onclick={handleConfirmReceipt}
+						disabled={isCompleting}
+						class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition-colors disabled:opacity-50"
+					>
+						{#if isCompleting}
+							<span class="animate-spin text-xs">⏳</span>
+							<span>Memproses...</span>
+						{:else}
+							<CheckCircle2 class="h-4 w-4" />
+							<span>Konfirmasi Pesanan Diterima &amp; Ambil Poin</span>
+						{/if}
+					</button>
+				{:else}
+					<span class="text-xs text-stone-500 italic">
+						Status: {order.status}
+					</span>
+				{/if}
+			</div>
+		</div>
+
 		<!-- Status Timeline Stepper -->
-		<div class="my-8 rounded-2xl border border-[#E8DFD0] bg-white p-6 shadow-sm">
+		<div class="my-6 rounded-2xl border border-[#E8DFD0] bg-white p-6 shadow-sm">
 			<h2 class="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-6 text-center">
 				Status Pesanan Real-Time
 			</h2>
@@ -104,16 +195,30 @@
 			<div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
 				<!-- Step 1: Diterima -->
 				<div class="flex flex-col items-center text-center">
-					<div class="flex h-10 w-10 items-center justify-center rounded-full bg-[#1F1810] text-white shadow-sm mb-2">
+					<div
+						class="flex h-10 w-10 items-center justify-center rounded-full mb-2 shadow-sm {['Diterima', 'Disiapkan', 'Dikirim', 'Selesai'].includes(order.status)
+							? 'bg-[#1F1810] text-white'
+							: 'bg-stone-100 border border-[#E8DFD0] text-stone-500'}"
+					>
 						<Clock class="h-5 w-5" />
 					</div>
 					<span class="text-xs font-bold text-[#1F1810]">1. Diterima</span>
-					<span class="text-[11px] text-stone-500 mt-0.5">Menunggu Pembayaran</span>
+					<span class="text-[11px] text-stone-500 mt-0.5">
+						{order.paymentStatus === 'Paid' || order.paymentStatus === 'Lunas' ? 'Pembayaran Terkonfirmasi' : 'Menunggu Pembayaran'}
+					</span>
 				</div>
 
 				<!-- Step 2: Disiapkan -->
-				<div class="flex flex-col items-center text-center opacity-60">
-					<div class="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 border border-[#E8DFD0] text-stone-500 mb-2">
+				<div
+					class="flex flex-col items-center text-center {['Disiapkan', 'Dikirim', 'Selesai'].includes(order.status)
+						? ''
+						: 'opacity-60'}"
+				>
+					<div
+						class="flex h-10 w-10 items-center justify-center rounded-full mb-2 shadow-sm {['Disiapkan', 'Dikirim', 'Selesai'].includes(order.status)
+							? 'bg-[#1F1810] text-white'
+							: 'bg-stone-100 border border-[#E8DFD0] text-stone-500'}"
+					>
 						<Package class="h-5 w-5" />
 					</div>
 					<span class="text-xs font-semibold text-stone-700">2. Disiapkan</span>
@@ -121,8 +226,16 @@
 				</div>
 
 				<!-- Step 3: Dikirim -->
-				<div class="flex flex-col items-center text-center opacity-60">
-					<div class="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 border border-[#E8DFD0] text-stone-500 mb-2">
+				<div
+					class="flex flex-col items-center text-center {['Dikirim', 'Selesai'].includes(order.status)
+						? ''
+						: 'opacity-60'}"
+				>
+					<div
+						class="flex h-10 w-10 items-center justify-center rounded-full mb-2 shadow-sm {['Dikirim', 'Selesai'].includes(order.status)
+							? 'bg-[#1F1810] text-white'
+							: 'bg-stone-100 border border-[#E8DFD0] text-stone-500'}"
+					>
 						<Truck class="h-5 w-5" />
 					</div>
 					<span class="text-xs font-semibold text-stone-700">3. Dikirim</span>
@@ -130,8 +243,16 @@
 				</div>
 
 				<!-- Step 4: Selesai & Dirakit -->
-				<div class="flex flex-col items-center text-center opacity-60">
-					<div class="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 border border-[#E8DFD0] text-stone-500 mb-2">
+				<div
+					class="flex flex-col items-center text-center {order.status === 'Selesai'
+						? ''
+						: 'opacity-60'}"
+				>
+					<div
+						class="flex h-10 w-10 items-center justify-center rounded-full mb-2 shadow-sm {order.status === 'Selesai'
+							? 'bg-emerald-600 text-white'
+							: 'bg-stone-100 border border-[#E8DFD0] text-stone-500'}"
+					>
 						<Home class="h-5 w-5" />
 					</div>
 					<span class="text-xs font-semibold text-stone-700">4. Selesai</span>
@@ -307,13 +428,22 @@
 
 					<!-- Action Buttons -->
 					<div class="space-y-2 pt-3 print:hidden">
+						<a
+							href="/checkout/invoice/{order.orderNumber}"
+							target="_blank"
+							class="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1F1810] py-3 text-xs font-semibold text-white shadow-sm transition-all hover:bg-[#B5652F]"
+						>
+							<FileText class="h-4 w-4" />
+							<span>Buka &amp; Cetak Faktur Resmi (A4 PDF)</span>
+						</a>
+
 						<button
 							type="button"
 							onclick={handlePrint}
-							class="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1F1810] py-3 text-xs font-semibold text-white shadow-sm transition-all hover:bg-[#B5652F]"
+							class="flex w-full items-center justify-center gap-2 rounded-xl border border-[#E8DFD0] bg-[#FAF8F5] py-2.5 text-xs font-semibold text-stone-700 transition-colors hover:bg-stone-100"
 						>
-							<Printer class="h-4 w-4" />
-							<span>Cetak / Simpan E-Invoice</span>
+							<Printer class="h-4 w-4 text-[#B5652F]" />
+							<span>Cetak Halaman Konfirmasi Ini</span>
 						</button>
 
 						<a

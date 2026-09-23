@@ -7,9 +7,16 @@ export default defineConfig({
 	retries: process.env.CI ? 2 : 0,
 	workers: 1,
 	reporter: 'list',
+	timeout: 60000,
 	use: {
 		baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:5173',
 		trace: 'on-first-retry'
+	},
+	webServer: {
+		command: 'npm run dev',
+		url: 'http://localhost:5173',
+		reuseExistingServer: true,
+		timeout: 120000
 	},
 	projects: [
 		{

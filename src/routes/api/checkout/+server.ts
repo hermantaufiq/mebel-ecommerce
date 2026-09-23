@@ -184,6 +184,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 					items: {
 						create: verifiedItems.map((item) => ({
 							productId: item.productId,
+							variantId: item.variantId,
 							variantLabel: item.variantLabel,
 							qty: item.qty,
 							priceAtOrder: item.priceAtOrder

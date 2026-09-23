@@ -13,7 +13,7 @@ test.describe('Alur Kritis End-to-End: Guest Browse -> Add to Cart -> Login in-b
 		// 3. Buka halaman detail salah satu produk
 		const firstProductLink = page.locator('a[href^="/produk/"]').first();
 		await firstProductLink.click();
-		await page.waitForURL(/\/produk\/.+/);
+		await page.waitForURL(/\/produk\/.+/, { waitUntil: 'domcontentloaded' });
 
 		// 4. Pilih varian jika ada dan klik tombol Tambah ke Keranjang
 		const addToCartBtn = page.locator('button:has-text("Tambah ke Keranjang")');
@@ -36,7 +36,7 @@ test.describe('Alur Kritis End-to-End: Guest Browse -> Add to Cart -> Login in-b
 		// 7. Klik Submit Pesanan sebagai guest -> harus diarahkan ke login dengan redirect param
 		const submitBtn = page.locator('button[type="submit"]');
 		await submitBtn.click();
-		await page.waitForURL(/\/login\?redirect=.+/);
+		await page.waitForURL(/\/login\?redirect=.+/, { waitUntil: 'domcontentloaded' });
 
 		// 8. Beralih ke tab Daftar Akun Baru
 		const registerTab = page.locator('button:has-text("Daftar Akun Baru")');
@@ -53,7 +53,7 @@ test.describe('Alur Kritis End-to-End: Guest Browse -> Add to Cart -> Login in-b
 		await submitRegBtn.click();
 
 		// 9. Harus otomatis redirect kembali ke /keranjang dan cart item tetap ada
-		await page.waitForURL(/\/keranjang/);
+		await page.waitForURL(/\/keranjang/, { waitUntil: 'domcontentloaded' });
 		await expect(page.locator('text=Budi Wicaksono')).toBeVisible();
 
 		// 10. Selesaikan pesanan sebagai user terautentikasi
@@ -61,7 +61,7 @@ test.describe('Alur Kritis End-to-End: Guest Browse -> Add to Cart -> Login in-b
 		await finalSubmitBtn.click();
 
 		// 11. Verifikasi sampai ke halaman Konfirmasi Pesanan
-		await page.waitForURL(/\/checkout\/konfirmasi\?order=.+/);
+		await page.waitForURL(/\/checkout\/konfirmasi\?order=.+/, { waitUntil: 'domcontentloaded' });
 		await expect(page.locator('h1')).toContainText(/Pesanan Berhasil/);
 		await expect(page.locator('text=Budi Wicaksono')).toBeVisible();
 	});

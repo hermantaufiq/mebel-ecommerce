@@ -161,7 +161,7 @@
 
 			showFeedback(
 				'success',
-				`Pesanan #${order.orderNumber} selesai! Anda mendapatkan +${result.result?.pointsEarned ?? 0} poin loyalitas.`
+				`Pesanan #${order.orderNumber} selesai! Anda mendapatkan +${result.result?.pointsAwarded ?? 0} poin loyalitas.`
 			);
 		} catch (err: any) {
 			console.error('Error completing order:', err);
