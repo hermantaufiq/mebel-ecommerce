@@ -2,9 +2,26 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/prisma';
 import { verifyPassword, hashPassword, setSessionCookie } from '$lib/server/auth';
+import { authRateLimiter } from '$lib/server/rate-limiter';
 
-export const POST: RequestHandler = async ({ request, cookies }) => {
+export const POST: RequestHandler = async ({ request, cookies, getClientAddress }) => {
 	try {
+		// Rate limiting check (Tahap 5 Koreksi 4)
+		const clientIp = getClientAddress();
+		const rateCheck = authRateLimiter.check(`login:${clientIp}`);
+		if (!rateCheck.allowed) {
+			return json(
+				{ error: 'Terlalu banyak percobaan masuk. Silakan coba lagi dalam beberapa saat.' },
+				{
+					status: 429,
+					headers: {
+						'Retry-After': String(Math.ceil(rateCheck.resetInMs / 1000)),
+						'X-RateLimit-Remaining': '0'
+					}
+				}
+			);
+		}
+
 		const { email, password, guestCartItems } = await request.json();
 
 		if (!email || !password) {

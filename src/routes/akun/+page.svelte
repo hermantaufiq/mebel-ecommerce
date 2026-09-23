@@ -32,6 +32,15 @@
 	import Calendar from '@lucide/svelte/icons/calendar';
 	import Award from '@lucide/svelte/icons/award';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
+	import Settings from '@lucide/svelte/icons/settings';
+	import Plus from '@lucide/svelte/icons/plus';
+	import Pencil from '@lucide/svelte/icons/pencil';
+	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import Lock from '@lucide/svelte/icons/lock';
+	import UserIcon from '@lucide/svelte/icons/user';
+	import Loader2 from '@lucide/svelte/icons/loader-2';
+	import X from '@lucide/svelte/icons/x';
+	import { getPasswordStrength, PASSWORD_MIN_LENGTH } from '$lib/schemas/auth';
 
 	let { data }: { data: PageData } = $props();
 
@@ -43,7 +52,7 @@
 	let addresses = $derived(data.addresses || []);
 
 	// Active navigation tab
-	let activeTab = $state<'orders' | 'rewards' | 'my-rewards' | 'addresses' | 'concierge'>('orders');
+	let activeTab = $state<'orders' | 'rewards' | 'my-rewards' | 'addresses' | 'profile' | 'concierge'>('orders');
 
 	// Reward category filter
 	let selectedCategory = $state<string>('all');
@@ -242,6 +251,184 @@
 				return 'bg-slate-200 text-slate-800 border-slate-300 shadow-2xs';
 			default:
 				return 'bg-stone-100 text-stone-700 border-stone-300';
+		}
+	}
+
+	// Profile management state
+	// svelte-ignore state_referenced_locally
+	let editName = $state(data.user.name || '');
+	let isSavingProfile = $state(false);
+
+	let currentPassword = $state('');
+	let newPassword = $state('');
+	let confirmNewPassword = $state('');
+	let isChangingPassword = $state(false);
+
+	let newPwStrength = $derived(getPasswordStrength(newPassword));
+	let isNewPasswordValid = $derived(newPassword.length >= PASSWORD_MIN_LENGTH);
+	let isChangePasswordReady = $derived(
+		isNewPasswordValid && newPassword === confirmNewPassword && currentPassword.length > 0
+	);
+
+	// Address CRUD modal & state
+	let showAddressModal = $state(false);
+	let editingAddressId = $state<string | null>(null);
+	let addressForm = $state({
+		recipient: '',
+		phone: '',
+		fullAddress: '',
+		notes: '',
+		isDefault: false
+	});
+	let isSavingAddress = $state(false);
+	let deletingAddressId = $state<string | null>(null);
+
+	async function handleUpdateProfile(e: SubmitEvent) {
+		e.preventDefault();
+		if (!editName.trim()) return;
+		isSavingProfile = true;
+		try {
+			const res = await fetch('/api/auth/profile', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ name: editName.trim() })
+			});
+			const result = await res.json();
+			if (!res.ok) {
+				showFeedback('error', result.error || 'Gagal memperbarui profil');
+			} else {
+				showFeedback('success', 'Nama profil berhasil diperbarui');
+				await invalidateAll();
+			}
+		} catch {
+			showFeedback('error', 'Terjadi kesalahan koneksi saat memperbarui profil');
+		} finally {
+			isSavingProfile = false;
+		}
+	}
+
+	async function handleChangePassword(e: SubmitEvent) {
+		e.preventDefault();
+		if (!isChangePasswordReady) return;
+		isChangingPassword = true;
+		try {
+			const res = await fetch('/api/auth/profile?action=change-password', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ currentPassword, newPassword })
+			});
+			const result = await res.json();
+			if (!res.ok) {
+				showFeedback('error', result.error || 'Gagal mengubah kata sandi');
+			} else {
+				showFeedback('success', 'Kata sandi berhasil diperbarui');
+				currentPassword = '';
+				newPassword = '';
+				confirmNewPassword = '';
+			}
+		} catch {
+			showFeedback('error', 'Terjadi kesalahan saat mengubah kata sandi');
+		} finally {
+			isChangingPassword = false;
+		}
+	}
+
+	function openAddAddressModal() {
+		editingAddressId = null;
+		addressForm = {
+			recipient: user.name || '',
+			phone: '',
+			fullAddress: '',
+			notes: '',
+			isDefault: addresses.length === 0
+		};
+		showAddressModal = true;
+	}
+
+	function openEditAddressModal(addr: any) {
+		editingAddressId = addr.id;
+		addressForm = {
+			recipient: addr.recipient,
+			phone: addr.phone,
+			fullAddress: addr.fullAddress,
+			notes: addr.notes || '',
+			isDefault: addr.isDefault
+		};
+		showAddressModal = true;
+	}
+
+	async function handleSaveAddress(e: SubmitEvent) {
+		e.preventDefault();
+		isSavingAddress = true;
+		try {
+			const isEdit = !!editingAddressId;
+			const res = await fetch('/api/addresses', {
+				method: isEdit ? 'PUT' : 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(isEdit ? { id: editingAddressId, ...addressForm } : addressForm)
+			});
+			const result = await res.json();
+			if (!res.ok) {
+				showFeedback('error', result.error || 'Gagal menyimpan alamat');
+			} else {
+				showFeedback('success', isEdit ? 'Alamat berhasil diperbarui' : 'Alamat baru berhasil ditambahkan');
+				showAddressModal = false;
+				await invalidateAll();
+			}
+		} catch {
+			showFeedback('error', 'Terjadi kesalahan saat menyimpan alamat');
+		} finally {
+			isSavingAddress = false;
+		}
+	}
+
+	async function handleSetDefaultAddress(addr: any) {
+		if (addr.isDefault) return;
+		try {
+			const res = await fetch('/api/addresses', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					id: addr.id,
+					recipient: addr.recipient,
+					phone: addr.phone,
+					fullAddress: addr.fullAddress,
+					notes: addr.notes,
+					isDefault: true
+				})
+			});
+			const result = await res.json();
+			if (!res.ok) {
+				showFeedback('error', result.error || 'Gagal mengubah alamat default');
+			} else {
+				showFeedback('success', 'Alamat utama berhasil diubah');
+				await invalidateAll();
+			}
+		} catch {
+			showFeedback('error', 'Terjadi kesalahan saat mengatur alamat utama');
+		}
+	}
+
+	async function handleDeleteAddress(addressId: string) {
+		if (!confirm('Apakah Anda yakin ingin menghapus alamat ini?')) return;
+		deletingAddressId = addressId;
+		try {
+			const res = await fetch('/api/addresses', {
+				method: 'DELETE',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ id: addressId })
+			});
+			const result = await res.json();
+			if (!res.ok) {
+				showFeedback('error', result.error || 'Gagal menghapus alamat');
+			} else {
+				showFeedback('success', 'Alamat berhasil dihapus');
+				await invalidateAll();
+			}
+		} catch {
+			showFeedback('error', 'Terjadi kesalahan saat menghapus alamat');
+		} finally {
+			deletingAddressId = null;
 		}
 	}
 </script>
@@ -465,7 +652,19 @@
 						: 'text-stone-600 hover:bg-[#F7F3EC]'}"
 				>
 					<MapPin class="h-4 w-4" />
-					<span>Buku Alamat</span>
+					<span>Buku Alamat ({addresses.length})</span>
+				</button>
+
+				<button
+					type="button"
+					onclick={() => (activeTab = 'profile')}
+					class="flex items-center gap-2 rounded-xl px-3.5 sm:px-4 py-2 text-xs font-semibold whitespace-nowrap shrink-0 transition-all {activeTab ===
+					'profile'
+						? 'bg-[#1F1810] text-white shadow-sm'
+						: 'text-stone-600 hover:bg-[#F7F3EC]'}"
+				>
+					<Settings class="h-4 w-4" />
+					<span>Profil &amp; Keamanan</span>
 				</button>
 
 				<button
@@ -933,56 +1132,294 @@
 
 			<!-- TAB 4: BUKU ALAMAT -->
 			{:else if activeTab === 'addresses'}
-				<div class="rounded-2xl border border-[#E8DFD0] bg-white p-6 shadow-sm space-y-4">
-					<div class="flex items-center justify-between">
-						<h2 class="font-serif text-lg font-semibold text-[#1F1810]">
-							Buku Alamat Pengiriman
-						</h2>
+				<div class="rounded-2xl border border-[#E8DFD0] bg-white p-6 shadow-sm space-y-6">
+					<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-[#E8DFD0]">
+						<div>
+							<h2 class="font-serif text-lg font-semibold text-[#1F1810]">
+								Buku Alamat Pengiriman
+							</h2>
+							<p class="text-xs text-stone-500 mt-0.5">
+								Kelola alamat tujuan pengiriman pesanan karya mebel Anda.
+							</p>
+						</div>
+						<button
+							type="button"
+							onclick={openAddAddressModal}
+							class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#1F1810] px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-[#B5652F] transition-colors self-start sm:self-auto"
+						>
+							<Plus class="h-4 w-4" />
+							<span>Tambah Alamat Baru</span>
+						</button>
 					</div>
 
 					{#if addresses.length > 0}
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 							{#each addresses as addr}
-								<div class="rounded-xl border border-[#E8DFD0] bg-[#F7F3EC]/50 p-5 space-y-2">
-									<div class="flex items-center justify-between">
-										<span class="font-serif text-sm font-bold text-[#1F1810]"
-											>{addr.isDefault ? 'Alamat Utama' : 'Alamat Pengiriman'}</span
-										>
-										{#if addr.isDefault}
-											<Badge class="bg-[#1F1810] text-white text-[10px]">Default</Badge>
+								<div class="rounded-xl border {addr.isDefault ? 'border-[#B5652F]/60 bg-[#FAF8F5]' : 'border-[#E8DFD0] bg-white'} p-5 space-y-3 shadow-2xs hover:border-[#B5652F]/40 transition-colors flex flex-col justify-between">
+									<div class="space-y-2">
+										<div class="flex items-center justify-between gap-2">
+											<div class="flex items-center gap-2">
+												{#if addr.isDefault}
+													<span class="inline-flex items-center gap-1 rounded-md bg-[#1F1810] px-2 py-0.5 text-[10px] font-bold text-white">
+														<Check class="h-3 w-3" />
+														Alamat Utama
+													</span>
+												{:else}
+													<span class="text-xs font-medium text-stone-500">Alamat Alternatif</span>
+												{/if}
+											</div>
+											<div class="flex items-center gap-1">
+												<button
+													type="button"
+													onclick={() => openEditAddressModal(addr)}
+													class="p-1.5 text-stone-400 hover:text-stone-700 hover:bg-[#F7F3EC] rounded-lg transition-colors"
+													title="Edit Alamat"
+												>
+													<Pencil class="h-3.5 w-3.5" />
+												</button>
+												<button
+													type="button"
+													onclick={() => handleDeleteAddress(addr.id)}
+													disabled={deletingAddressId === addr.id}
+													class="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-40"
+													title="Hapus Alamat"
+												>
+													{#if deletingAddressId === addr.id}
+														<Loader2 class="h-3.5 w-3.5 animate-spin text-rose-500" />
+													{:else}
+														<Trash2 class="h-3.5 w-3.5" />
+													{/if}
+												</button>
+											</div>
+										</div>
+
+										<p class="text-xs font-bold text-[#1F1810]">
+											{addr.recipient} <span class="font-normal text-stone-500">({addr.phone})</span>
+										</p>
+										<p class="text-xs text-stone-600 leading-relaxed">
+											{addr.fullAddress}
+										</p>
+										{#if addr.notes}
+											<div class="text-[11px] text-stone-500 italic bg-stone-50 rounded-lg px-2.5 py-1.5">
+												Catatan: {addr.notes}
+											</div>
 										{/if}
 									</div>
-									<p class="text-xs font-semibold text-stone-800">
-										{addr.recipient} ({addr.phone})
-									</p>
-									<p class="text-xs text-stone-600 leading-relaxed">
-										{addr.fullAddress}
-									</p>
-									{#if addr.notes}
-										<div class="pt-2 text-[11px] text-stone-500 italic">
-											Catatan: {addr.notes}
+
+									{#if !addr.isDefault}
+										<div class="pt-2 border-t border-[#E8DFD0]/60">
+											<button
+												type="button"
+												onclick={() => handleSetDefaultAddress(addr)}
+												class="text-[11px] font-semibold text-[#B5652F] hover:text-[#9E5424] hover:underline transition-colors"
+											>
+												Jadikan Alamat Utama
+											</button>
 										</div>
 									{/if}
 								</div>
 							{/each}
 						</div>
 					{:else}
-						<div class="rounded-xl border border-[#E8DFD0] bg-[#F7F3EC]/50 p-5 space-y-2">
-							<div class="flex items-center justify-between">
-								<span class="font-serif text-sm font-bold text-[#1F1810]">Rumah (Utama)</span>
-								<Badge class="bg-[#1F1810] text-white text-[10px]">Default</Badge>
+						<div class="rounded-2xl border border-dashed border-[#E8DFD0] bg-[#FAF8F5] p-10 text-center space-y-3">
+							<MapPin class="mx-auto h-10 w-10 text-stone-300" />
+							<div class="space-y-1">
+								<h3 class="font-serif text-base font-bold text-[#1F1810]">Belum Ada Alamat Tersimpan</h3>
+								<p class="text-xs text-stone-500 max-w-sm mx-auto">
+									Tambahkan alamat pengiriman rumah, kantor, atau studio Anda untuk mempercepat proses pemesanan.
+								</p>
 							</div>
-							<p class="text-xs font-semibold text-stone-800">
-								{user.name} (0812-3456-7890)
-							</p>
-							<p class="text-xs text-stone-600 leading-relaxed">
-								Jl. Senopati Raya No. 42, Kebayoran Baru, Jakarta Selatan 12190
-							</p>
-							<div class="pt-2 text-[11px] text-stone-500 italic">
-								Catatan: Akses lift barang tersedia.
-							</div>
+							<button
+								type="button"
+								onclick={openAddAddressModal}
+								class="inline-flex items-center gap-1.5 rounded-xl bg-[#1F1810] px-5 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-[#B5652F] transition-colors"
+							>
+								<Plus class="h-4 w-4" />
+								<span>Tambah Alamat Pertama</span>
+							</button>
 						</div>
 					{/if}
+				</div>
+
+			<!-- TAB: PROFIL & KEAMANAN -->
+			{:else if activeTab === 'profile'}
+				<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+					<!-- Card 1: Profil Pengguna -->
+					<div class="rounded-2xl border border-[#E8DFD0] bg-white p-6 shadow-sm space-y-5">
+						<div class="flex items-center gap-3 pb-3 border-b border-[#E8DFD0]">
+							<div class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#B5652F]/10 text-[#B5652F]">
+								<UserIcon class="h-5 w-5" />
+							</div>
+							<div>
+								<h2 class="font-serif text-base font-bold text-[#1F1810]">Informasi Profil</h2>
+								<p class="text-[11px] text-stone-500">Kelola identitas akun Anda di Maison Lumina.</p>
+							</div>
+						</div>
+
+						<form onsubmit={handleUpdateProfile} class="space-y-4">
+							<div>
+								<label for="profile-name" class="block text-xs font-medium text-stone-700 mb-1">
+									Nama Lengkap *
+								</label>
+								<input
+									id="profile-name"
+									type="text"
+									required
+									bind:value={editName}
+									class="w-full rounded-xl border border-[#E8DFD0] px-3.5 py-2.5 text-xs text-[#1F1810] focus:border-[#B5652F] focus:outline-none"
+									placeholder="Nama lengkap Anda"
+								/>
+							</div>
+
+							<div>
+								<label for="profile-email" class="block text-xs font-medium text-stone-700 mb-1">
+									Alamat Email
+								</label>
+								<input
+									id="profile-email"
+									type="email"
+									disabled
+									value={user.email}
+									class="w-full rounded-xl border border-stone-200 bg-stone-50 px-3.5 py-2.5 text-xs text-stone-500 cursor-not-allowed"
+								/>
+								<span class="mt-1 block text-[10px] text-stone-400">
+									Alamat email terdaftar tidak dapat diubah demi keamanan akun.
+								</span>
+							</div>
+
+							<div class="rounded-xl border border-[#E8DFD0] bg-[#FAF8F5] p-3 text-xs flex items-center justify-between">
+								<span class="text-stone-600 font-medium">Tingkat Membership:</span>
+								<span class="font-bold text-[#B5652F]">{tierMeta.label} ({user.loyaltyPoints || 0} Poin)</span>
+							</div>
+
+							<button
+								type="submit"
+								disabled={isSavingProfile || !editName.trim()}
+								class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#1F1810] py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-[#B5652F] transition-colors disabled:opacity-50"
+							>
+								{#if isSavingProfile}
+									<Loader2 class="h-3.5 w-3.5 animate-spin" />
+									<span>Menyimpan Perubahan...</span>
+								{:else}
+									<Check class="h-3.5 w-3.5" />
+									<span>Simpan Perubahan Profil</span>
+								{/if}
+							</button>
+						</form>
+					</div>
+
+					<!-- Card 2: Ubah Kata Sandi -->
+					<div class="rounded-2xl border border-[#E8DFD0] bg-white p-6 shadow-sm space-y-5">
+						<div class="flex items-center gap-3 pb-3 border-b border-[#E8DFD0]">
+							<div class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-700">
+								<Lock class="h-5 w-5" />
+							</div>
+							<div>
+								<h2 class="font-serif text-base font-bold text-[#1F1810]">Keamanan &amp; Kata Sandi</h2>
+								<p class="text-[11px] text-stone-500">Perbarui kata sandi secara berkala untuk menjaga akun tetap aman.</p>
+							</div>
+						</div>
+
+						<form onsubmit={handleChangePassword} class="space-y-4">
+							<div>
+								<label for="curr-password" class="block text-xs font-medium text-stone-700 mb-1">
+									Kata Sandi Saat Ini *
+								</label>
+								<input
+									id="curr-password"
+									type="password"
+									required
+									bind:value={currentPassword}
+									class="w-full rounded-xl border border-[#E8DFD0] px-3.5 py-2.5 text-xs text-[#1F1810] focus:border-[#B5652F] focus:outline-none"
+									placeholder="••••••••"
+								/>
+							</div>
+
+							<div>
+								<label for="new-password" class="block text-xs font-medium text-stone-700 mb-1">
+									Kata Sandi Baru (Min. {PASSWORD_MIN_LENGTH} Karakter) *
+								</label>
+								<input
+									id="new-password"
+									type="password"
+									required
+									minlength={PASSWORD_MIN_LENGTH}
+									bind:value={newPassword}
+									class="w-full rounded-xl border border-[#E8DFD0] px-3.5 py-2.5 text-xs text-[#1F1810] focus:border-[#B5652F] focus:outline-none"
+									placeholder="••••••••"
+								/>
+
+								<!-- Password Strength Indicator (UX aid only) -->
+								{#if newPassword.length > 0}
+									<div class="mt-2 space-y-1.5">
+										<div class="flex gap-1">
+											{#each [1, 2, 3, 4] as seg}
+												<div
+													class="h-1.5 flex-1 rounded-full transition-all duration-300"
+													style="background-color: {newPwStrength.level >= seg ? newPwStrength.color : '#E8DFD0'}"
+												></div>
+											{/each}
+										</div>
+										<span class="text-[10px] font-semibold" style="color: {newPwStrength.color}">
+											Kekuatan: {newPwStrength.label}
+										</span>
+										<div class="grid grid-cols-2 gap-1 text-[10px]">
+											<div class="flex items-center gap-1 {newPwStrength.checks.minLength ? 'text-emerald-600' : 'text-stone-400'}">
+												{#if newPwStrength.checks.minLength}<Check class="h-2.5 w-2.5" />{:else}<X class="h-2.5 w-2.5" />{/if}
+												<span>Min. {PASSWORD_MIN_LENGTH} karakter</span>
+											</div>
+											<div class="flex items-center gap-1 {newPwStrength.checks.hasUpperLower ? 'text-emerald-600' : 'text-stone-400'}">
+												{#if newPwStrength.checks.hasUpperLower}<Check class="h-2.5 w-2.5" />{:else}<X class="h-2.5 w-2.5" />{/if}
+												<span>Huruf besar &amp; kecil</span>
+											</div>
+											<div class="flex items-center gap-1 {newPwStrength.checks.hasNumber ? 'text-emerald-600' : 'text-stone-400'}">
+												{#if newPwStrength.checks.hasNumber}<Check class="h-2.5 w-2.5" />{:else}<X class="h-2.5 w-2.5" />{/if}
+												<span>Mengandung angka</span>
+											</div>
+											<div class="flex items-center gap-1 {newPwStrength.checks.hasSymbol ? 'text-emerald-600' : 'text-stone-400'}">
+												{#if newPwStrength.checks.hasSymbol}<Check class="h-2.5 w-2.5" />{:else}<X class="h-2.5 w-2.5" />{/if}
+												<span>Karakter khusus</span>
+											</div>
+										</div>
+									</div>
+								{/if}
+							</div>
+
+							<div>
+								<label for="conf-new-password" class="block text-xs font-medium text-stone-700 mb-1">
+									Konfirmasi Kata Sandi Baru *
+								</label>
+								<input
+									id="conf-new-password"
+									type="password"
+									required
+									minlength={PASSWORD_MIN_LENGTH}
+									bind:value={confirmNewPassword}
+									class="w-full rounded-xl border border-[#E8DFD0] px-3.5 py-2.5 text-xs text-[#1F1810] focus:border-[#B5652F] focus:outline-none"
+									placeholder="••••••••"
+								/>
+								{#if confirmNewPassword.length > 0 && newPassword !== confirmNewPassword}
+									<span class="mt-1 block text-[10px] text-rose-500 font-medium">
+										Konfirmasi kata sandi tidak cocok.
+									</span>
+								{/if}
+							</div>
+
+							<button
+								type="submit"
+								disabled={isChangingPassword || !isChangePasswordReady}
+								class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#B5652F] py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-[#9E5424] transition-colors disabled:opacity-50"
+							>
+								{#if isChangingPassword}
+									<Loader2 class="h-3.5 w-3.5 animate-spin" />
+									<span>Memperbarui Kata Sandi...</span>
+								{:else}
+									<Lock class="h-3.5 w-3.5" />
+									<span>Perbarui Kata Sandi</span>
+								{/if}
+							</button>
+						</form>
+					</div>
 				</div>
 
 			<!-- TAB 5: CONCIERGE ATELIER -->
@@ -1136,3 +1573,123 @@
 		</div>
 	</div>
 {/if}
+
+<!-- ADDRESS ADD / EDIT MODAL -->
+{#if showAddressModal}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in fade-in duration-150"
+	>
+		<div
+			class="w-full max-w-lg rounded-3xl border border-[#E8DFD0] bg-white p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto"
+		>
+			<div class="flex items-center justify-between border-b border-[#E8DFD0] pb-3">
+				<div class="flex items-center gap-2 text-stone-900">
+					<MapPin class="h-5 w-5 text-[#B5652F]" />
+					<h3 class="font-serif text-lg font-bold">
+						{editingAddressId ? 'Edit Alamat Pengiriman' : 'Tambah Alamat Baru'}
+					</h3>
+				</div>
+				<button
+					type="button"
+					onclick={() => (showAddressModal = false)}
+					class="p-1.5 text-stone-400 hover:text-stone-700 rounded-lg transition-colors"
+				>
+					<X class="h-5 w-5" />
+				</button>
+			</div>
+
+			<form onsubmit={handleSaveAddress} class="space-y-4 text-xs">
+				<div>
+					<label for="addr-recipient" class="block font-medium text-stone-700 mb-1">
+						Nama Penerima *
+					</label>
+					<input
+						id="addr-recipient"
+						type="text"
+						required
+						bind:value={addressForm.recipient}
+						placeholder="Contoh: Dian Sastrowardoyo"
+						class="w-full rounded-xl border border-[#E8DFD0] px-3.5 py-2.5 text-[#1F1810] focus:border-[#B5652F] focus:outline-none"
+					/>
+				</div>
+
+				<div>
+					<label for="addr-phone" class="block font-medium text-stone-700 mb-1">
+						Nomor Telepon / WhatsApp *
+					</label>
+					<input
+						id="addr-phone"
+						type="tel"
+						required
+						bind:value={addressForm.phone}
+						placeholder="Contoh: 081234567890"
+						class="w-full rounded-xl border border-[#E8DFD0] px-3.5 py-2.5 text-[#1F1810] focus:border-[#B5652F] focus:outline-none"
+					/>
+				</div>
+
+				<div>
+					<label for="addr-full" class="block font-medium text-stone-700 mb-1">
+						Alamat Lengkap &amp; Kode Pos *
+					</label>
+					<textarea
+						id="addr-full"
+						rows="3"
+						required
+						bind:value={addressForm.fullAddress}
+						placeholder="Nama jalan, nomor rumah/gedung, RT/RW, kelurahan, kecamatan, kota, provinsi, dan kode pos"
+						class="w-full rounded-xl border border-[#E8DFD0] px-3.5 py-2.5 text-[#1F1810] focus:border-[#B5652F] focus:outline-none resize-none"
+					></textarea>
+				</div>
+
+				<div>
+					<label for="addr-notes" class="block font-medium text-stone-700 mb-1">
+						Catatan Pengiriman (Opsional)
+					</label>
+					<input
+						id="addr-notes"
+						type="text"
+						bind:value={addressForm.notes}
+						placeholder="Contoh: Rumah pagar hitam, titip di satpam jika tidak ada orang"
+						class="w-full rounded-xl border border-[#E8DFD0] px-3.5 py-2.5 text-[#1F1810] focus:border-[#B5652F] focus:outline-none"
+					/>
+				</div>
+
+				<div class="pt-1">
+					<label class="flex items-center gap-2 cursor-pointer select-none">
+						<input
+							type="checkbox"
+							bind:checked={addressForm.isDefault}
+							class="h-4 w-4 rounded border-stone-300 text-[#B5652F] focus:ring-[#B5652F]"
+						/>
+						<span class="text-stone-700 font-medium">Jadikan alamat pengiriman utama (default)</span>
+					</label>
+				</div>
+
+				<div class="flex items-center justify-end gap-3 pt-3 border-t border-[#E8DFD0]">
+					<button
+						type="button"
+						onclick={() => (showAddressModal = false)}
+						disabled={isSavingAddress}
+						class="rounded-xl border border-[#E8DFD0] bg-white px-4 py-2.5 text-xs font-semibold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+					>
+						Batal
+					</button>
+					<button
+						type="submit"
+						disabled={isSavingAddress}
+						class="inline-flex items-center gap-2 rounded-xl bg-[#1F1810] px-5 py-2.5 text-xs font-semibold text-white hover:bg-[#B5652F] transition-colors disabled:opacity-50 shadow-sm"
+					>
+						{#if isSavingAddress}
+							<Loader2 class="h-3.5 w-3.5 animate-spin" />
+							<span>Menyimpan...</span>
+						{:else}
+							<Check class="h-4 w-4" />
+							<span>{editingAddressId ? 'Simpan Perubahan' : 'Tambah Alamat'}</span>
+						{/if}
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
+{/if}
+

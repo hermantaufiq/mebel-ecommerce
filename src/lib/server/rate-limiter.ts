@@ -7,7 +7,7 @@ interface RateLimitRecord {
 	resetTime: number;
 }
 
-class InMemoryRateLimiter {
+export class InMemoryRateLimiter {
 	private records = new Map<string, RateLimitRecord>();
 	private windowMs: number;
 	private maxRequests: number;

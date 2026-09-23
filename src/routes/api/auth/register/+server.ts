@@ -2,18 +2,38 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/prisma';
 import { hashPassword, setSessionCookie } from '$lib/server/auth';
+import { authRateLimiter } from '$lib/server/rate-limiter';
+import { registerSchema } from '$lib/schemas/auth';
 
-export const POST: RequestHandler = async ({ request, cookies }) => {
+export const POST: RequestHandler = async ({ request, cookies, getClientAddress }) => {
 	try {
-		const { name, email, password, guestCartItems = [] } = await request.json();
-
-		if (!name || !email || !password) {
-			return json({ error: 'Nama, email, dan kata sandi wajib diisi' }, { status: 400 });
+		// Rate limiting check (Tahap 5)
+		const clientIp = getClientAddress();
+		const rateCheck = authRateLimiter.check(`register:${clientIp}`);
+		if (!rateCheck.allowed) {
+			return json(
+				{ error: 'Terlalu banyak percobaan pendaftaran. Silakan coba lagi dalam beberapa saat.' },
+				{
+					status: 429,
+					headers: {
+						'Retry-After': String(Math.ceil(rateCheck.resetInMs / 1000)),
+						'X-RateLimit-Remaining': '0'
+					}
+				}
+			);
 		}
 
-		if (password.length < 6) {
-			return json({ error: 'Kata sandi minimal 6 karakter' }, { status: 400 });
+		const body = await request.json();
+		const { guestCartItems = [] } = body;
+
+		// Zod validation — single source of truth for min 8 chars (Koreksi 1)
+		const parseResult = registerSchema.safeParse(body);
+		if (!parseResult.success) {
+			const firstError = parseResult.error.issues?.[0];
+			return json({ error: firstError?.message || 'Data pendaftaran tidak valid' }, { status: 400 });
 		}
+
+		const { name, email, password } = parseResult.data;
 
 		const normalizedEmail = email.trim().toLowerCase();
 

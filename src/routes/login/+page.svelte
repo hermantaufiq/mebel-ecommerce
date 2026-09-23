@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { cartStore } from '$lib/stores/cart.svelte';
 	import Breadcrumb from '$lib/components/ui/breadcrumb/Breadcrumb.svelte';
+	import { getPasswordStrength, PASSWORD_MIN_LENGTH } from '$lib/schemas/auth';
 
 	import Lock from '@lucide/svelte/icons/lock';
 	import Mail from '@lucide/svelte/icons/mail';
@@ -12,6 +13,8 @@
 	import AlertCircle from '@lucide/svelte/icons/alert-circle';
 	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import ShoppingBag from '@lucide/svelte/icons/shopping-bag';
+	import Check from '@lucide/svelte/icons/check';
+	import X from '@lucide/svelte/icons/x';
 
 	let mode = $state<'login' | 'register'>('login');
 
@@ -27,6 +30,13 @@
 	// State
 	let isLoading = $state(false);
 	let errorMessage = $state('');
+
+	// Derived password strength (UX aid only — NOT validation substitute)
+	let pwStrength = $derived(getPasswordStrength(regPassword));
+	let isRegPasswordValid = $derived(regPassword.length >= PASSWORD_MIN_LENGTH);
+	let isRegFormReady = $derived(
+		isRegPasswordValid && regPassword === regConfirmPassword && regName.length > 0 && regEmail.length > 0
+	);
 
 	let redirectUrl = $derived($page.url.searchParams.get('redirect') || '/akun');
 	let isFromCheckout = $derived(
@@ -308,20 +318,76 @@
 
 					<div>
 						<label for="reg-password" class="block text-xs font-medium text-stone-700 mb-1">
-							Kata Sandi (Min. 6 Karakter) *
+							Kata Sandi (Min. {PASSWORD_MIN_LENGTH} Karakter) *
 						</label>
 						<div class="relative">
 							<input
 								id="reg-password"
 								type="password"
 								required
-								minlength="6"
+								minlength={PASSWORD_MIN_LENGTH}
 								bind:value={regPassword}
 								placeholder="••••••••"
 								class="w-full rounded-xl border border-[#E8DFD0] pl-10 pr-3 py-2.5 text-xs text-[#1F1810] focus:border-[#B5652F] focus:outline-none"
 							/>
 							<Lock class="h-4 w-4 text-stone-400 absolute left-3.5 top-3 pointer-events-none" />
 						</div>
+
+						<!-- Password Strength Indicator (UX aid only) -->
+						{#if regPassword.length > 0}
+							<div class="mt-2.5 space-y-2">
+								<!-- 4-segment bar -->
+								<div class="flex gap-1">
+									{#each [1, 2, 3, 4] as seg}
+										<div
+											class="h-1.5 flex-1 rounded-full transition-all duration-300"
+											style="background-color: {pwStrength.level >= seg ? pwStrength.color : '#E8DFD0'}"
+										></div>
+									{/each}
+								</div>
+
+								<!-- Label -->
+								<span class="text-[10px] font-semibold" style="color: {pwStrength.color}">
+									Kekuatan: {pwStrength.label}
+								</span>
+
+								<!-- Requirement checklist -->
+								<div class="grid grid-cols-2 gap-1 text-[10px]">
+									<div class="flex items-center gap-1 {pwStrength.checks.minLength ? 'text-emerald-600' : 'text-stone-400'}">
+										{#if pwStrength.checks.minLength}
+											<Check class="h-2.5 w-2.5" />
+										{:else}
+											<X class="h-2.5 w-2.5" />
+										{/if}
+										<span>Min. {PASSWORD_MIN_LENGTH} karakter</span>
+									</div>
+									<div class="flex items-center gap-1 {pwStrength.checks.hasUpperLower ? 'text-emerald-600' : 'text-stone-400'}">
+										{#if pwStrength.checks.hasUpperLower}
+											<Check class="h-2.5 w-2.5" />
+										{:else}
+											<X class="h-2.5 w-2.5" />
+										{/if}
+										<span>Huruf besar & kecil</span>
+									</div>
+									<div class="flex items-center gap-1 {pwStrength.checks.hasNumber ? 'text-emerald-600' : 'text-stone-400'}">
+										{#if pwStrength.checks.hasNumber}
+											<Check class="h-2.5 w-2.5" />
+										{:else}
+											<X class="h-2.5 w-2.5" />
+										{/if}
+										<span>Mengandung angka</span>
+									</div>
+									<div class="flex items-center gap-1 {pwStrength.checks.hasSymbol ? 'text-emerald-600' : 'text-stone-400'}">
+										{#if pwStrength.checks.hasSymbol}
+											<Check class="h-2.5 w-2.5" />
+										{:else}
+											<X class="h-2.5 w-2.5" />
+										{/if}
+										<span>Karakter khusus</span>
+									</div>
+								</div>
+							</div>
+						{/if}
 					</div>
 
 					<div>
@@ -333,7 +399,7 @@
 								id="reg-confirm-password"
 								type="password"
 								required
-								minlength="6"
+								minlength={PASSWORD_MIN_LENGTH}
 								bind:value={regConfirmPassword}
 								placeholder="••••••••"
 								class="w-full rounded-xl border border-[#E8DFD0] pl-10 pr-3 py-2.5 text-xs text-[#1F1810] focus:border-[#B5652F] focus:outline-none"
@@ -344,7 +410,7 @@
 
 					<button
 						type="submit"
-						disabled={isLoading}
+						disabled={isLoading || !isRegFormReady}
 						class="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#B5652F] py-3 text-xs font-semibold text-white shadow-sm transition-all hover:bg-[#9E5424] active:scale-[0.98] disabled:opacity-50"
 					>
 						{#if isLoading}
