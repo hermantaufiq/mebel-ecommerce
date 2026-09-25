@@ -15,10 +15,17 @@ export const POST: RequestHandler = async ({ request }) => {
 				const productId = item.productId || item.id;
 				const variantId = item.variantId || null;
 
-				const product = await prisma.product.findUnique({
+				let product = await prisma.product.findUnique({
 					where: { id: productId },
 					select: { id: true, name: true, price: true }
 				});
+
+				if (!product && item.slug) {
+					product = await prisma.product.findUnique({
+						where: { slug: item.slug },
+						select: { id: true, name: true, price: true }
+					});
+				}
 
 				if (!product) {
 					return {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import crypto from 'node:crypto';
-import { verifyWebhookSignature } from '../routes/api/webhooks/payment/+server';
+import { verifyWebhookSignature } from './server/webhook';
 import { calculateCartTotals } from './cart-calculations';
 import { calculateTier, getNextTierInfo } from './tier-config';
 

@@ -153,9 +153,24 @@ export class CartStore {
 					body: JSON.stringify(payload)
 				});
 
+				const data = await res.json().catch(() => ({}));
+
+				// Guest user: local cart in localStorage is the single source of truth!
+				// If server responds with guest: true or 401 (not authenticated),
+				// do NOT wipe or rollback localStorage cart.
+				if (data.guest === true || res.status === 401) {
+					this.isSyncing = false;
+					this.pendingSnapshot = null;
+					return true;
+				}
+
 				if (!res.ok) {
-					const data = await res.json().catch(() => ({}));
 					throw new Error(data.error || `Server error: ${res.status}`);
+				}
+
+				if (Array.isArray(data.items)) {
+					this.items = data.items;
+					this.save();
 				}
 			}
 
@@ -164,7 +179,13 @@ export class CartStore {
 			this.pendingSnapshot = null;
 			return true;
 		} catch (err: any) {
-			this.rollback(err.message || 'Gagal menyinkronkan keranjang dengan server');
+			if (this.syncHandler) {
+				this.rollback(err.message || 'Gagal menyinkronkan keranjang dengan server');
+			} else {
+				console.warn('[CartStore] sync error, preserving local items in localStorage:', err);
+				this.isSyncing = false;
+				this.pendingSnapshot = null;
+			}
 			return false;
 		}
 	}
@@ -372,6 +393,10 @@ export class CartStore {
 			adjustedQty: number;
 		}>
 	): { adjustedCount: number; removedCount: number; adjustedItemIds: string[] } {
+		if (!Array.isArray(validatedList) || validatedList.length === 0) {
+			return { adjustedCount: 0, removedCount: 0, adjustedItemIds: [] };
+		}
+
 		let adjustedCount = 0;
 		let removedCount = 0;
 		const adjustedItemIds: string[] = [];
@@ -385,7 +410,13 @@ export class CartStore {
 					(v.productId === item.productId && (v.variantId ?? null) === targetVariant)
 			);
 
-			if (!match || !match.isAvailable || match.availableStock <= 0) {
+			// If item was not found in validation response, preserve it locally
+			if (!match) {
+				nextItems.push(item);
+				continue;
+			}
+
+			if (!match.isAvailable || match.availableStock <= 0) {
 				removedCount++;
 				continue;
 			}

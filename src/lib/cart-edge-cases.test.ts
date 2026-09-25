@@ -308,4 +308,74 @@ describe('Tahap 3 Cart & Wishlist Edge Cases', () => {
 			expect(wishlist.isWishlisted('item-server-only')).toBe(true);
 		});
 	});
+
+	describe('Guest Cart Preservation & Stock Validation Resiliency', () => {
+		it('preserves existing cart items when syncWithValidated receives empty or partial results', () => {
+			cart.setItems([
+				{
+					id: 'item-preserved-1',
+					productId: 'prod-chair-1',
+					variantId: null,
+					name: 'Kursi Aksen',
+					image: '/test.jpg',
+					unitPrice: 2000000,
+					qty: 2,
+					maxStock: 5
+				}
+			]);
+
+			// Case 1: Empty validation list should NOT wipe out cart
+			const resEmpty = cart.syncWithValidated([]);
+			expect(resEmpty.removedCount).toBe(0);
+			expect(cart.items.length).toBe(1);
+			expect(cart.items[0]?.qty).toBe(2);
+
+			// Case 2: Validation list with unmatched items preserves unmatched local item
+			const resUnmatched = cart.syncWithValidated([
+				{
+					id: 'different-item',
+					productId: 'other-prod',
+					variantId: null,
+					isAvailable: true,
+					availableStock: 10,
+					currentPrice: 1000000,
+					adjustedQty: 1
+				}
+			]);
+			expect(resUnmatched.removedCount).toBe(0);
+			expect(cart.items.length).toBe(1);
+			expect(cart.items[0]?.name).toBe('Kursi Aksen');
+		});
+
+		it('properly reduces qty when available stock is lower than in cart', () => {
+			cart.setItems([
+				{
+					id: 'item-stock-limit',
+					productId: 'prod-limited',
+					variantId: 'var-1',
+					name: 'Meja Terbatas',
+					image: '/test.jpg',
+					unitPrice: 5000000,
+					qty: 5,
+					maxStock: 10
+				}
+			]);
+
+			const res = cart.syncWithValidated([
+				{
+					id: 'item-stock-limit',
+					productId: 'prod-limited',
+					variantId: 'var-1',
+					isAvailable: true,
+					availableStock: 2,
+					currentPrice: 5000000,
+					adjustedQty: 2
+				}
+			]);
+
+			expect(res.adjustedCount).toBe(1);
+			expect(cart.items[0]?.qty).toBe(2);
+			expect(cart.items[0]?.maxStock).toBe(2);
+		});
+	});
 });

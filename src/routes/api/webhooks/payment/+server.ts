@@ -1,25 +1,10 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/prisma';
-import crypto from 'node:crypto';
+import { verifyWebhookSignature, DEFAULT_WEBHOOK_SECRET } from '$lib/server/webhook';
 
-// Default webhook secret key (synced with .env PAYMENT_WEBHOOK_SECRET)
-const DEFAULT_WEBHOOK_SECRET = process.env.PAYMENT_WEBHOOK_SECRET || 'maison_lumina_webhook_secret_key_2026';
-
-/**
- * Validates HMAC SHA-256 signature from payment gateway webhook request
- */
-export function verifyWebhookSignature(rawBody: string, signature: string | null, secret = DEFAULT_WEBHOOK_SECRET): boolean {
-	if (!signature || !secret) return false;
-	try {
-		const cleanSig = signature.replace(/^sha256=/, '').trim().toLowerCase();
-		const computed = crypto.createHmac('sha256', secret).update(rawBody).digest('hex').toLowerCase();
-		if (cleanSig.length !== computed.length) return false;
-		return crypto.timingSafeEqual(Buffer.from(cleanSig), Buffer.from(computed));
-	} catch {
-		return false;
-	}
-}
+// Re-export with underscore prefix so SvelteKit allows it as private export
+export const _verifyWebhookSignature = verifyWebhookSignature;
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
